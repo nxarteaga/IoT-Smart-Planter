@@ -2,10 +2,12 @@
 .ccsproject
 .cproject
 .project
-.settings/org.eclipse.cdt.codan.core.prefs
-.settings/org.eclipse.cdt.debug.core.prefs
-targetConfigs/readme.txt
-targetConfigs/Tiva TM4C123GH6PM.ccxml
+.settings/
+.settings/
+.launches/
+Debug/
+targetConfigs/
+targetConfigs/
 
 # VS Code
 /.vscode
