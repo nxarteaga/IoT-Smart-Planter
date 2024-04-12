@@ -477,7 +477,30 @@ int main(void)
     // Init ethernet interface (eth0)
     putsUart0("\nStarting eth0\n");
     initEther(ETHER_UNICAST | ETHER_BROADCAST | ETHER_HALFDUPLEX);
-    setEtherMacAddress(2, 3, 4, 5, 6, 102);
+    setEtherMacAddress(2, 3, 4, 5, 6, 0x79);
+    disableDhcp();
+
+    /*
+    // Setting static IP (no DHCP) at home
+    uint8_t homeIpAddr[4] = {192, 168, 0, 122};
+    uint8_t homeSubNet[4] = {255, 255, 255, 0};
+    uint8_t homeGwAddr[4] = {192, 168, 0, 1};
+    setIpAddress(myIpAddr);
+    setIpSubnetMask(mySubNet);
+    setIpGatewayAddress(myGwAddr);
+    setIpDnsAddress(myGwAddr);
+    */
+
+    /*
+    // Setting static IP in lab
+    uint8_t labIpAddr[4] = {192, 168, 1, 121};
+    uint8_t labSubNet[4] = {255, 255, 255, 0};
+    uint8_t labGwAddr[4] = {192, 168, 1, 1};
+    setIpAddress(myIpAddr);
+    setIpSubnetMask(mySubNet);
+    setIpGatewayAddress(myGwAddr);
+    setIpDnsAddress(myGwAddr);
+    */
 
     // Init EEPROM
     initEeprom();
