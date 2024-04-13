@@ -271,29 +271,31 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
     tcp->offsetFields |= tcpHeaderLength;
     tcp->offsetFields = htons(tcp->offsetFields);
 
+    tcp->windowSize = htons(1500); //how far back I can look to give you stuff that is missing. Small window due to constrains in the redboard.
+    tcp->urgentPointer = htons(0);
 
     // checksum
     // adjust lengths
     tcpLength = sizeof(tcpHeader) + dataSize;
     ip->length = htons(sizeof(ipHeader) + tcpLength);
 
-       // 32-bit sum over ip header
-       calcIpChecksum(ip);
+    // 32-bit sum over ip header
+    calcIpChecksum(ip);
 
     // set tcp length
     // probably don't have to do this -r
 
-       // 32-bit sum over pseudo-header
-       sum = 0;
-       sumIpWords(ip->sourceIp, 8, &sum);
-       tmp16 = ip->protocol;
-       sum += (tmp16 & 0xff) << 8;
-       sumIpWords(&tmp16, 2, &sum);
+    // 32-bit sum over pseudo-header
+    sum = 0;
+    sumIpWords(ip->sourceIp, 8, &sum);
+    tmp16 = ip->protocol;
+    sum += (tmp16 & 0xff) << 8;
+    sumIpWords(&tmp16, 2, &sum);
 
     // add tcp header
-       tcp->checksum = 0;
-       sumIpWords(tcp, tcpLength, &sum);
-       tcp->checksum = getIpChecksum(sum);
+    tcp->checksum = 0;
+    sumIpWords(tcp, tcpLength, &sum);
+    tcp->checksum = getIpChecksum(sum);
 
     // send packet with size = ether + udp hdr + ip header + udp_size
     putEtherPacket(ether, sizeof(etherHeader) + ipHeaderLength + tcpLength);
