@@ -240,7 +240,7 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
     ip->size = 0x5;
     ip->typeOfService = 0;
     ip->id = 0;
-    ip->flagsAndOffset = 0;
+    ip->flagsAndOffset = htons(0x4000); // "Don't Fragment" (DF) flag
     ip->ttl = 64; //64 | 128? I think, not sure.verify!!!
     // in lab, other TCP connections use 64 so its probably fine -r
     ip->protocol = PROTOCOL_TCP;
