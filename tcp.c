@@ -209,8 +209,6 @@ void sendTcpResponse(etherHeader *ether, socket* s, uint16_t flags)
 {
 }
 
-
-
 // How to get socket?
 // dataSize?
 // Send TCP message
@@ -260,18 +258,13 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
     tcp->destPort = htons(s->remotePort);
     tcp->sequenceNumber = htonl(s->sequenceNumber);
     tcp->acknowledgementNumber = htonl(s->acknowledgementNumber);
- 
-    // TODO: offsetFields, data
 
-    tcp->offsetFields = 0;
-    //tcp->offsetFields This is 16bit flag. Some bits need to be changed in here.
-    setFlags(tcp->offsetFields,flags);
-    tcp->offsetFields &= ~(0xF000);
-    tcpHeaderLength = ((sizeof(tcpHeader) / 4) << OFS_SHIFT);
-    tcp->offsetFields |= tcpHeaderLength;
-    tcp->offsetFields = htons(tcp->offsetFields);
+    // Sets data option and flag bits
+    tcp->offsetFields = htons(((sizeof(tcpHeader) / 4) << OFS_SHIFT) | flags);
 
     tcp->windowSize = htons(1500); //how far back I can look to give you stuff that is missing. Small window due to constrains in the redboard.
+    // changed it to 1500 based on Dr. Losh comments during lecture -r
+
     tcp->urgentPointer = htons(0);
 
     // Copy passed in data into tcp struct
