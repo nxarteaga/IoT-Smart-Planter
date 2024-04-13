@@ -1,5 +1,5 @@
 // TCP Library
-// Modified by Nestor Arteaga
+// Modified by Nestor Arteaga and Rolando Rosales (1001850424)
 // Jason Losh
 
 //-----------------------------------------------------------------------------
@@ -21,27 +21,14 @@
 #include <string.h>
 #include "arp.h"
 #include "tcp.h"
-#include "dhcp.h" //Make a function in dhcp.h/c to return the hardware address of the server. This will be used in sendTcpMessage. serverHW_Address is part of Ethernet frame
 #include "timer.h"
+#include "dhcp.h" //Make a function in dhcp.h/c to return the hardware address of the server. This will be used in sendTcpMessage. serverHW_Address is part of Ethernet frame
 
-// ------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 //  Globals
-// ------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 
 #define MAX_TCP_PORTS 4
-#define TCP 6
-//// TCP states
-//#define TCP_CLOSED 0
-//#define TCP_LISTEN 1
-//#define TCP_SYN_RECEIVED 2
-//#define TCP_SYN_SENT 3
-//#define TCP_ESTABLISHED 4
-//#define TCP_FIN_WAIT_1 5
-//#define TCP_FIN_WAIT_2 6
-//#define TCP_CLOSING 7
-//#define TCP_CLOSE_WAIT 8
-//#define TCP_LAST_ACK 9
-//#define TCP_TIME_WAIT 10
 
 uint16_t tcpPorts[MAX_TCP_PORTS];
 uint8_t tcpPortCount = 0;
@@ -52,18 +39,13 @@ uint32_t sequenceNumber = 0;// This might need to be randomly generated. Sequenc
 //socket gets information during state machine/connection
 //tcp->offsetFields will need to be or'ed with ACK|flags
 
-
-// ------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 //  Structures
-// ------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------
-
-
-
-
 
 // Set TCP state
 void setTcpState(uint8_t instance, uint8_t state)
@@ -81,19 +63,11 @@ uint8_t getTcpState(uint8_t instance)
 // Must be an IP packet
 bool isTcp(etherHeader* ether)
 {
-      //uint8_t i = 0;
-      // IP header
-     ipHeader* ip = (ipHeader*)ether->data;
-     if(ip->protocol == TCP)
-     {
-         return true;
-     }else
-     {
-         return false;
-     }
-
+    ipHeader* ip = (ipHeader*)ether->data;
+    return (ip->protocol == PROTOCOL_TCP) ? true : false;
 }
 
+// TODO: write isTcpSyn function
 bool isTcpSyn(etherHeader *ether)
 {
     return false;
@@ -103,9 +77,7 @@ bool isTcpSyn(etherHeader *ether)
 uint8_t *getTCPHeaderPtr(etherHeader *ether)
 {
     ipHeader *ip = (ipHeader*)ether->data;
-    //uint8_t ipHeaderLength = ip->size * 4;
-    //TCP header frame
-    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip+(ip->size*4));
+    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + (ip->size * 4));
     return (uint8_t*)tcp;
 }
 
@@ -187,30 +159,33 @@ void sendTcpPendingMessages(etherHeader *ether)
 
 }
 
+// TODO: write processTcpResponse function
 void processTcpResponse(etherHeader *ether)
 {
 }
 
+// TODO: write processTcpArpResponse function
 void processTcpArpResponse(etherHeader *ether)
 {
 
 }
 
+// TODO: write setTcpPortList function
 void setTcpPortList(uint16_t ports[], uint8_t count)
 {
 }
 
+// TODO: write isTcpPortOpen function
 bool isTcpPortOpen(etherHeader *ether)
 {
     return false;
 }
 
+// TODO: write sendTcpResponse function
 void sendTcpResponse(etherHeader *ether, socket* s, uint16_t flags)
 {
 }
 
-// How to get socket?
-// dataSize?
 // Send TCP message
 void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[], uint16_t dataSize)
 {
@@ -252,7 +227,7 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
     uint8_t ipHeaderLength = ip->size * 4;
 
     // TCP header
-    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip+(ip->size*4));
+    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + (ip->size * 4));
 
     tcp->sourcePort = htons(s->localPort);
     tcp->destPort = htons(s->remotePort);
