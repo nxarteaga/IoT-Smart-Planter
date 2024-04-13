@@ -274,6 +274,12 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
     tcp->windowSize = htons(1500); //how far back I can look to give you stuff that is missing. Small window due to constrains in the redboard.
     tcp->urgentPointer = htons(0);
 
+    // Copy passed in data into tcp struct
+    for (i = 0; i < dataSize; i++)
+    {
+        tcp->data[i] = data[i];
+    }
+
     // checksum
     // adjust lengths
     tcpLength = sizeof(tcpHeader) + dataSize;
