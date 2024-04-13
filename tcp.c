@@ -245,39 +245,40 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
     // in lab, other TCP connections use 64 so its probably fine -r
     ip->protocol = PROTOCOL_TCP;
     ip->headerChecksum = 0;
-    uint8_t ipHeaderLength = ip->size * 4;
-
     for(i = 0; i < IP_ADD_LENGTH; i++)
     {
         ip->sourceIp[i] = localIpAddress[i];
         ip->destIp[i] = s->remoteIpAddress[i]; //once again this might be with socket variable *s
+        // I think this is also correct -r
     }
+    uint8_t ipHeaderLength = ip->size * 4;
 
     // TCP header
     tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip+(ip->size*4));
 
-    tcp->sourcePort = s->localPort; //use htons here?
-    tcp->destPort = s->remotePort; //
-    tcp->sequenceNumber = s->sequenceNumber;//
-    tcp->acknowledgementNumber = s->acknowledgementNumber;
-    tcp->windowSize = 1280; //how far back I can look to give you stuff that is missing. Small window due to constrains in the redboard.
-    tcp->urgentPointer = 0;
+    tcp->sourcePort = htons(s->localPort);
+    tcp->destPort = htons(s->remotePort);
+    tcp->sequenceNumber = htonl(s->sequenceNumber);
+    tcp->acknowledgementNumber = htonl(s->acknowledgementNumber);
+ 
+    // TODO: offsetFields, data
+
     tcp->offsetFields = 0;
     //tcp->offsetFields This is 16bit flag. Some bits need to be changed in here.
     setFlags(tcp->offsetFields,flags);
-    tcpLength = sizeof(tcpHeader)+dataSize;
     tcp->offsetFields &= ~(0xF000);
-    tcpHeaderLength = ((sizeof(tcpHeader)/4) << OFS_SHIFT);
+    tcpHeaderLength = ((sizeof(tcpHeader) / 4) << OFS_SHIFT);
     tcp->offsetFields |= tcpHeaderLength;
-    tcp->offsetFields =htons(tcp->offsetFields);
+    tcp->offsetFields = htons(tcp->offsetFields);
 
 
+    // checksum
+    // adjust lengths
+    tcpLength = sizeof(tcpHeader) + dataSize;
+    ip->length = htons(sizeof(ipHeader) + tcpLength);
 
-    ip->length = htons(sizeof(ipHeader)+tcpLength);
        // 32-bit sum over ip header
        calcIpChecksum(ip);
-       // set udp length
-      // udp->length = htons(udpLength);
 
     // set tcp length
     // probably don't have to do this -r
