@@ -228,8 +228,8 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
     getEtherMacAddress(localHwAddress);
     for(i = 0; i < HW_ADD_LENGTH;i++)
     {
-        //ether->destAddress[i] = ; //Need to figure this one out. Maybe socket *s?
-        ether->destAddress[i] = s->remoteHwAddress[i];
+        //ether->destAddress[i] = //Need to figure this one out. Maybe socket *s?
+        ether->destAddress[i] = s->remoteHwAddress[i]; // I think this is correct -r
         ether->sourceAddress[i] = localHwAddress[i];
     }
     ether->frameType = htons(TYPE_IP);
@@ -242,6 +242,7 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
     ip->id = 0;
     ip->flagsAndOffset = 0;
     ip->ttl = 64; //64 | 128? I think, not sure.verify!!!
+    // in lab, other TCP connections use 64 so its probably fine -r
     ip->protocol = PROTOCOL_TCP;
     ip->headerChecksum = 0;
     uint8_t ipHeaderLength = ip->size * 4;
@@ -262,7 +263,7 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
     tcp->windowSize = 1280; //how far back I can look to give you stuff that is missing. Small window due to constrains in the redboard.
     tcp->urgentPointer = 0;
     tcp->offsetFields = 0;
-    //tcp->offsetFields This is 16bit flag. Some bits need to be changed in here. T
+    //tcp->offsetFields This is 16bit flag. Some bits need to be changed in here.
     setFlags(tcp->offsetFields,flags);
     tcpLength = sizeof(tcpHeader)+dataSize;
     tcp->offsetFields &= ~(0xF000);
@@ -278,6 +279,8 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
        // set udp length
       // udp->length = htons(udpLength);
 
+    // set tcp length
+    // probably don't have to do this -r
 
        // 32-bit sum over pseudo-header
        sum = 0;
@@ -285,10 +288,13 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
        tmp16 = ip->protocol;
        sum += (tmp16 & 0xff) << 8;
        sumIpWords(&tmp16, 2, &sum);
-       // add udp header
+
+    // add tcp header
        tcp->checksum = 0;
        sumIpWords(tcp, tcpLength, &sum);
        tcp->checksum = getIpChecksum(sum);
+
+    // send packet with size = ether + udp hdr + ip header + udp_size
     putEtherPacket(ether, sizeof(etherHeader) + ipHeaderLength + tcpLength);
 
     sequenceNumber += dataSize;
