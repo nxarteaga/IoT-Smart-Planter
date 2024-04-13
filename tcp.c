@@ -219,11 +219,12 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
     uint16_t tcpHeaderLength = 0;
     uint8_t localHwAddress[6];
     uint8_t localIpAddress[4];
-    uint8_t i =0;
+    uint8_t i = 0;
     uint32_t sum;
     uint16_t tmp16;
     uint16_t tcpLength = 0;
-    //Part of ethernet Frame
+
+    // Ether frame
     getEtherMacAddress(localHwAddress);
     for(i = 0; i < HW_ADD_LENGTH;i++)
     {
@@ -231,10 +232,8 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
         ether->destAddress[i] = s->remoteHwAddress[i];
         ether->sourceAddress[i] = localHwAddress[i];
     }
-
     ether->frameType = htons(TYPE_IP);
 
-    //
     // IP header
     ipHeader* ip = (ipHeader*)ether->data;
     ip->rev = 0x4;
@@ -253,7 +252,7 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
         ip->destIp[i] = s->remoteIpAddress[i]; //once again this might be with socket variable *s
     }
 
-    //TCP header frame
+    // TCP header
     tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip+(ip->size*4));
 
     tcp->sourcePort = s->localPort; //use htons here?
@@ -291,6 +290,6 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
        sumIpWords(tcp, tcpLength, &sum);
        tcp->checksum = getIpChecksum(sum);
     putEtherPacket(ether, sizeof(etherHeader) + ipHeaderLength + tcpLength);
-    sequenceNumber += dataSize;
 
+    sequenceNumber += dataSize;
 }
