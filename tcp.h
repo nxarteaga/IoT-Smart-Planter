@@ -62,7 +62,6 @@ typedef struct _tcpHeader // 20 or more bytes
 #define NS  0x0100
 #define OFS_SHIFT 12
 
-#define setFlags(x,y) (x |= (y))
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------
@@ -75,7 +74,6 @@ typedef struct Tcb
      uint16_t window_Size;
 
 }TCB;
-
 
 void setTcpState(uint8_t instance, uint8_t state);
 uint8_t getTcpState(uint8_t instance);
