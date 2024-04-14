@@ -59,37 +59,54 @@ uint8_t getTcpState(uint8_t instance)
     return tcpState[instance];
 }
 
+//similar to getOptions in DHCP. Getting ptr of TCP
+tcpHeader* getTcpHeaderPtr(etherHeader *ether)
+{
+    ipHeader *ip = (ipHeader*)ether->data;
+    return (tcpHeader*)((uint8_t*)ip + (ip->size * 4));
+}
+
 // Determines whether packet is TCP packet
 // Must be an IP packet
 bool isTcp(etherHeader* ether)
 {
     ipHeader* ip = (ipHeader*)ether->data;
-    return (ip->protocol == PROTOCOL_TCP) ? true : false;
+    uint8_t localHwAddress[6];
+    uint8_t i = 0;
+    bool ok = true;
+
+    getEtherMacAddress(localHwAddress);
+
+    if (ip->protocol == PROTOCOL_TCP)
+    {
+        for (i = 0; i < HW_ADD_LENGTH; i++)
+        {
+            if (ether->destAddress[i] != localHwAddress[i])
+            {
+                ok = false;
+                break;
+            }
+        }
+    }
+    else
+    {
+        ok = false;
 }
 
-// TODO: write isTcpSyn function
+    return ok;
+}
+
 bool isTcpSyn(etherHeader *ether)
 {
-    return false;
-}
-
-//similar to getOptions in DHCP. Getting ptr of TCP
-uint8_t *getTCPHeaderPtr(etherHeader *ether)
-{
-    ipHeader *ip = (ipHeader*)ether->data;
-    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + (ip->size * 4));
-    return (uint8_t*)tcp;
+    tcpHeader *tcp = getTcpHeaderPtr(ether);
+    return ((tcp->offsetFields & SYN) == SYN) ? true : false;
 }
 
 bool isTcpAck(etherHeader *ether)
 {
-     tcpHeader *tcp = (tcpHeader*)getTCPHeaderPtr(ether);
-     if((tcp->offsetFields & ACK) == ACK){
-         return true;
-     }else{
-         return false;
+    tcpHeader *tcp = getTcpHeaderPtr(ether);
+    return ((tcp->offsetFields & ACK) == ACK) ? true : false;
     }
-}
 
 void sendTcpPendingMessages(etherHeader *ether)
 {
