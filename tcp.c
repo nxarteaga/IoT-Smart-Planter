@@ -179,12 +179,22 @@ void sendTcpPendingMessages(etherHeader *ether)
 // TODO: write processTcpResponse function
 void processTcpResponse(etherHeader *ether)
 {
+    if (isTcp(ether))
+    {
+        if (isTcpSyn(ether))
+        {
+            // do something
+        }
+        if (isTcpAck(ether))
+        {
+            // do something
+        }
+    }
 }
 
 // TODO: write processTcpArpResponse function
 void processTcpArpResponse(etherHeader *ether)
 {
-
 }
 
 // TODO: write setTcpPortList function
