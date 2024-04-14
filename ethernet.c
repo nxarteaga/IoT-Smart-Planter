@@ -455,8 +455,8 @@ void processShell()
 
 int main(void)
 {
-//    char str[40];
-//    uint8_t* udpData;
+    // char str[40];
+    uint8_t* udpData;
     uint8_t buffer[MAX_PACKET_SIZE];
     etherHeader *data = (etherHeader*) buffer;
     socket s;
@@ -502,6 +502,32 @@ int main(void)
     setIpDnsAddress(myGwAddr);
     */
 
+    // socket stuff for my router
+    // ip
+    s.remoteIpAddress[0] = 192;
+    s.remoteIpAddress[1] = 168;
+    s.remoteIpAddress[2] = 0;
+    s.remoteIpAddress[3] = 1;
+
+    // hw
+    // not incl. as to not get ddos'd lol
+    s.remoteHwAddress[0] = 0x0;
+    s.remoteHwAddress[1] = 0x0;
+    s.remoteHwAddress[2] = 0x0;
+    s.remoteHwAddress[3] = 0x0;
+    s.remoteHwAddress[4] = 0x0;
+    s.remoteHwAddress[5] = 0x0;
+
+    // ports
+    s.remotePort = 65534;
+    s.localPort = 0;
+
+    // seq/ack nums
+    s.sequenceNumber = 1000;
+    s.acknowledgementNumber = 0;
+
+    s.state = 0;
+
     // Init EEPROM
     initEeprom();
     readConfiguration();
@@ -511,15 +537,22 @@ int main(void)
     setPinValue(GREEN_LED, 0);
     waitMicrosecond(100000);
 
+
+    sendTcpMessage(data, &s, SYN, 0, 0);
+
+    while (1)
+    {
+        processShell();
+        if (isTcp(data))
+        {
+            setPinValue(GREEN_LED, 1);
+        }
+    }
+
+    /*
     // Main Loop
     // RTOS and interrupts would greatly improve this code,
     // but the goal here is simplicity
-
-   // uint8_t i = 0;
-//    i = countTimers();
-//    snprintf(str, sizeof(str), "Total Counters %d\n",i);
-//    putsUart0(str);
-
     while (true)
     {
         // Put terminal processing here
@@ -528,7 +561,6 @@ int main(void)
         // DHCP maintenance
         if (isDhcpEnabled())
         {
-
             sendDhcpPendingMessages(data);
         }
 
@@ -573,16 +605,16 @@ int main(void)
                     }
 
                      //Handle UDP datagram
-//                    if (isUdp(data))
-//                    {
-//                        udpData = getUdpData(data);
-//                        if (strcmp((char*)udpData, "on") == 0)
-//                            setPinValue(GREEN_LED, 1);
-//                        if (strcmp((char*)udpData, "off") == 0)
-//                            setPinValue(GREEN_LED, 0);
-//                        getSocketInfoFromUdpPacket(data, &s);
-//                        sendUdpMessage(data, s, (uint8_t*)"Received", 9);
-//                    }
+                    if (isUdp(data))
+                    {
+                        udpData = getUdpData(data);
+                        if (strcmp((char*)udpData, "on") == 0)
+                            setPinValue(GREEN_LED, 1);
+                        if (strcmp((char*)udpData, "off") == 0)
+                            setPinValue(GREEN_LED, 0);
+                        getSocketInfoFromUdpPacket(data, &s);
+                        sendUdpMessage(data, s, (uint8_t*)"Received", 9);
+                    }
 
                     // Handle TCP datagram
                     if (isTcp(data))
@@ -595,19 +627,15 @@ int main(void)
                     }
                 }
             	// Handle DHCP response
-             //   else
-               // {
+                else
+                {
                     if (isUdp(data))
                         if (isDhcpResponse(data))
-
                             processDhcpResponse(data);
-//                        i = countTimers();
-//                        snprintf(str, sizeof(str), " Timers in use in processDHCP_Res %d\n",i);
-//                        putsUart0(str);
-                //}
+                }
             }
         }
     }
-
+    */
 }
 
