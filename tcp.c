@@ -218,6 +218,8 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
     // in lab, other TCP connections use 64 so its probably fine -r
     ip->protocol = PROTOCOL_TCP;
     ip->headerChecksum = 0;
+
+    getIpAddress(localIpAddress);
     for(i = 0; i < IP_ADD_LENGTH; i++)
     {
         ip->sourceIp[i] = localIpAddress[i];
@@ -229,8 +231,11 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
     // TCP header
     tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + (ip->size * 4));
 
+    // Ports
     tcp->sourcePort = htons(s->localPort);
     tcp->destPort = htons(s->remotePort);
+
+    // Seq/Ack nums
     tcp->sequenceNumber = htonl(s->sequenceNumber);
     tcp->acknowledgementNumber = htonl(s->acknowledgementNumber);
 
@@ -248,23 +253,23 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
         tcp->data[i] = data[i];
     }
 
-    // checksum
     // adjust lengths
     tcpLength = sizeof(tcpHeader) + dataSize;
-    ip->length = htons(sizeof(ipHeader) + tcpLength);
+    ip->length = htons(ipHeaderLength + tcpLength);
 
     // 32-bit sum over ip header
     calcIpChecksum(ip);
 
     // set tcp length
-    // probably don't have to do this -r
+    // no length in tcp struct
 
     // 32-bit sum over pseudo-header
     sum = 0;
     sumIpWords(ip->sourceIp, 8, &sum);
     tmp16 = ip->protocol;
     sum += (tmp16 & 0xff) << 8;
-    sumIpWords(&tmp16, 2, &sum);
+    tmp16 = htons(tcpLength);
+    sum += tmp16;
 
     // add tcp header
     tcp->checksum = 0;
@@ -273,6 +278,4 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
 
     // send packet with size = ether + udp hdr + ip header + udp_size
     putEtherPacket(ether, sizeof(etherHeader) + ipHeaderLength + tcpLength);
-
-    sequenceNumber += dataSize;
 }
