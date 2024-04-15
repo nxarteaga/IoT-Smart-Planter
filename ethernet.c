@@ -511,16 +511,20 @@ int main(void)
 
     // hw
     // not incl. as to not get ddos'd lol
-    s.remoteHwAddress[0] = 0x0;
-    s.remoteHwAddress[1] = 0x0;
-    s.remoteHwAddress[2] = 0x0;
-    s.remoteHwAddress[3] = 0x0;
-    s.remoteHwAddress[4] = 0x0;
-    s.remoteHwAddress[5] = 0x0;
+
+    /*
+    // Pi - b8:27:eb:19:cc:81
+    s.remoteHwAddress[0] = 0xb8;
+    s.remoteHwAddress[1] = 0x27;
+    s.remoteHwAddress[2] = 0xeb;
+    s.remoteHwAddress[3] = 0x19;
+    s.remoteHwAddress[4] = 0xcc;
+    s.remoteHwAddress[5] = 0x81;
+    */
 
     // ports
-    s.remotePort = 65534;
-    s.localPort = 0;
+    s.remotePort = 50000;
+    s.localPort = 1;
 
     // seq/ack nums
     s.sequenceNumber = 1000;
@@ -537,11 +541,13 @@ int main(void)
     setPinValue(GREEN_LED, 0);
     waitMicrosecond(100000);
 
+    getEtherPacket(data, MAX_PACKET_SIZE);
 
     sendTcpMessage(data, &s, SYN, 0, 0);
 
     while (1)
     {
+        getEtherPacket(data, MAX_PACKET_SIZE);
         processShell();
         if (isTcp(data))
         {
