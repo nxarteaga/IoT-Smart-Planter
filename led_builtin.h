@@ -1,10 +1,11 @@
 /*
- * Rolando Rosales LED Builtin Library for TM4C v1.0
+ * Rolando Rosales LED Builtin Library for TM4C v1.1
  * github.com/rolo-g
  *
  * Comments:
  * This is a very simple library that allows one to very easily
  * control the builtin LEDs on the TM4C123GH6PM MCU
+ * Requires Dr. Losh's GPIO Library from CSE 4342 (Embedded Systems II)
 */
 
 #ifndef LED_BUILTIN_H_
@@ -41,5 +42,10 @@ void toggleGreenLED();
 void enableBlueLED();
 void disableBlueLED();
 void toggleBlueLED();
+
+// All (White)
+void enableAllLEDs();
+void disableAllLEDs();
+void toggleAllLEDs();
 
 #endif
