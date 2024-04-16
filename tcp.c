@@ -98,16 +98,18 @@ bool isTcp(etherHeader* ether)
     return ok;
 }
 
+// FIXME: isTcpSyn function falsely returns true, needs testing
 bool isTcpSyn(etherHeader *ether)
 {
     tcpHeader *tcp = getTcpHeaderPtr(ether);
-    return ((tcp->offsetFields & SYN) == SYN) ? true : false;
+    return ((tcp->offsetFields & htons(SYN)) == htons(SYN)) ? true : false;
 }
 
+// FIXME: isTcpAck function falsely returns true, eeds testing
 bool isTcpAck(etherHeader *ether)
 {
     tcpHeader *tcp = getTcpHeaderPtr(ether);
-    return ((tcp->offsetFields & ACK) == ACK) ? true : false;
+    return ((tcp->offsetFields & htons(ACK)) == htons(ACK)) ? true : false;
 }
 
 // TODO: write sendTcpPendingMessages state machine
