@@ -82,7 +82,7 @@ bool isTcp(etherHeader *ether);
 bool isTcpSyn(etherHeader *ether);
 bool isTcpAck(etherHeader *ether);
 
-void sendTcpPendingMessages(etherHeader *ether);
+void sendTcpPendingMessages(etherHeader *ether, socket *s);
 void processDhcpResponse(etherHeader *ether);
 void processTcpArpResponse(etherHeader *ether);
 

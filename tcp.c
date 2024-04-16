@@ -23,12 +23,15 @@
 #include "tcp.h"
 #include "timer.h"
 #include "dhcp.h" //Make a function in dhcp.h/c to return the hardware address of the server. This will be used in sendTcpMessage. serverHW_Address is part of Ethernet frame
+#include "gpio.h"
 
 //-----------------------------------------------------------------------------
 //  Globals
 //-----------------------------------------------------------------------------
 
 #define MAX_TCP_PORTS 4
+
+#define GREEN_LED PORTF,3
 
 uint16_t tcpPorts[MAX_TCP_PORTS];
 uint8_t tcpPortCount = 0;
@@ -68,6 +71,7 @@ tcpHeader* getTcpHeaderPtr(etherHeader *ether)
 
 // Determines whether packet is TCP packet
 // Must be an IP packet
+// Makes sure that packet is ours
 bool isTcp(etherHeader* ether)
 {
     ipHeader* ip = (ipHeader*)ether->data;
@@ -91,8 +95,8 @@ bool isTcp(etherHeader* ether)
     else
     {
         ok = false;
-}
-
+    }
+    
     return ok;
 }
 
@@ -106,74 +110,30 @@ bool isTcpAck(etherHeader *ether)
 {
     tcpHeader *tcp = getTcpHeaderPtr(ether);
     return ((tcp->offsetFields & ACK) == ACK) ? true : false;
-    }
+}
 
-void sendTcpPendingMessages(etherHeader *ether)
+// TODO: write sendTcpPendingMessages state machine
+void sendTcpPendingMessages(etherHeader *ether, socket *s)
 {
-//        //State machine???
-//    uint8_t instance = MAX_TCP_PORTS;
-//    while(instance < MAX_TCP_PORTS)
-//    {
-//        if(getTcpState[instance] == TCP_CLOSED){
-//
-//        }
-//        i++
-//    }
-   uint8_t i = 0;
-   uint8_t data[1024] ={0};
-   uint16_t dataSize = 1000;
-  // TCB*  connections[MAX_TCP_PORTS];
-   socket * soc;
-   tcpHeader *tcp = (tcpHeader*)getTCPHeaderPtr(ether);
-  // uint8_t i = 0;
-//
-  // case TCP_CLOSED;
-   uint8_t serverIp[4];
+    switch (getTcpState(0))
+    {
+        case TCP_CLOSED:
+            sendTcpMessage(ether, s, SYN, 0, 0);
+            setTcpState(0, TCP_SYN_SENT);
+            break;
+        
+        case TCP_SYN_SENT:
+            if (isTcp(ether))
+            {
+                sendTcpMessage(ether,s, ACK, 0, 0);
+                setTcpState(0, TCP_ESTABLISHED);
+            }
+            break;
 
-
-           if(getTcpState(0) == TCP_CLOSED){
-               for(i = 0; i < IP_ADD_LENGTH; i++)
-               {
-                   soc->remoteIpAddress[i] = serverIp[i];//remote ip of device
-               }
-               //soc->remoteIpAddress
-               //sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[], uint16_t dataSize)
-               //uint16_t syn = SYN;
-               sendTcpMessage(ether, soc, SYN, data, dataSize);
-               setTcpState(0, TCP_SYN_SENT);
-           }else if((getTcpState(0) == TCP_SYN_SENT) && (isTcpAck(ether))==true)
-           {
-
-               setTcpState(0, TCP_SYN_SENT);
-           }
-
-
-//       }break;
-//       case TCP_SYN_SENT;
-//       {
-//       }break;
-//       case TCP_ESTABLISHED;
-//       {
-//       }break;
-//       case TCP_FIN_WAIT_1;
-//       {
-//       }break;
-//       case TCP_FIN_WAIT_2;
-//       {
-//       }break;
-//       case TCP_CLOSING;
-//       {
-//       }break;
-//       case TCP_CLOSE_WAIT;
-//       {
-//       }break;
-//       case TCP_LAST_ACK;
-//       {
-//       }break;
-//       case TCP_TIME_WAIT;
-//       {
-//       }break;
-
+        case TCP_ESTABLISHED:
+            setPinValue(GREEN_LED, 1);
+            break;
+    }
 }
 
 // TODO: write processTcpResponse function
@@ -193,8 +153,10 @@ void processTcpResponse(etherHeader *ether)
 }
 
 // TODO: write processTcpArpResponse function
+// This is where we will get the MAC and IP addresses
 void processTcpArpResponse(etherHeader *ether)
 {
+
 }
 
 // TODO: write setTcpPortList function
@@ -269,7 +231,7 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
     // Sets data option and flag bits
     tcp->offsetFields = htons(((sizeof(tcpHeader) / 4) << OFS_SHIFT) | flags);
 
-    tcp->windowSize = htons(1500); //how far back I can look to give you stuff that is missing. Small window due to constrains in the redboard.
+    tcp->windowSize = htons(1522); //how far back I can look to give you stuff that is missing. Small window due to constrains in the redboard.
     // changed it to 1500 based on Dr. Losh comments during lecture -r
 
     tcp->urgentPointer = htons(0);
