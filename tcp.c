@@ -240,6 +240,9 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
         tcp->data[i] = data[i];
     }
 
+    // Increment seq num by data size
+    s->sequenceNumber += dataSize;
+
     // adjust lengths
     tcpLength = sizeof(tcpHeader) + dataSize;
     ip->length = htons(ipHeaderLength + tcpLength);
