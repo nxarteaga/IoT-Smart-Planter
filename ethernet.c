@@ -56,7 +56,6 @@
 #include "tcp.h"
 #include "dhcp.h"
 #include "mqtt.h"
-#include "random.h"
 
 // Pins
 #define RED_LED PORTF,1
