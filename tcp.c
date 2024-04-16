@@ -22,7 +22,6 @@
 #include "arp.h"
 #include "tcp.h"
 #include "timer.h"
-#include "dhcp.h" //Make a function in dhcp.h/c to return the hardware address of the server. This will be used in sendTcpMessage. serverHW_Address is part of Ethernet frame
 #include "gpio.h"
 
 //-----------------------------------------------------------------------------
@@ -36,11 +35,10 @@
 uint16_t tcpPorts[MAX_TCP_PORTS];
 uint8_t tcpPortCount = 0;
 uint8_t tcpState[MAX_TCP_PORTS];
-uint32_t sequenceNumber = 0;// This might need to be randomly generated. Sequences should not start with value of zero as they become vulnerable to attacks.
-//Things to think about:
-//Maybe have a function to generate sequence number.
-//socket gets information during state machine/connection
-//tcp->offsetFields will need to be or'ed with ACK|flags
+
+bool synNeeded = false;
+bool ackNeeded = false;
+bool arpNeeded = true;
 
 //-----------------------------------------------------------------------------
 //  Structures
@@ -71,7 +69,7 @@ tcpHeader* getTcpHeaderPtr(etherHeader *ether)
 
 // Determines whether packet is TCP packet
 // Must be an IP packet
-// Makes sure that packet is ours
+// Additionally, this fn makes sure that packet is ours (hw addr)
 bool isTcp(etherHeader* ether)
 {
     ipHeader* ip = (ipHeader*)ether->data;
@@ -267,4 +265,6 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
 
     // send packet with size = ether + udp hdr + ip header + udp_size
     putEtherPacket(ether, sizeof(etherHeader) + ipHeaderLength + tcpLength);
+
+
 }
