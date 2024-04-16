@@ -30,10 +30,6 @@
 //  Globals
 //-----------------------------------------------------------------------------
 
-#define MAX_TCP_PORTS 4
-
-#define GREEN_LED PORTF,3
-
 uint16_t tcpPorts[MAX_TCP_PORTS];
 uint8_t tcpPortCount = 0;
 uint8_t tcpState[MAX_TCP_PORTS];
@@ -100,14 +96,14 @@ bool isTcp(etherHeader* ether)
     return ok;
 }
 
-// FIXME: isTcpSyn function falsely returns true, needs testing
+// TODO: isTcpSyn is now fixed, but may need further testing
 bool isTcpSyn(etherHeader *ether)
 {
     tcpHeader *tcp = getTcpHeaderPtr(ether);
     return ((tcp->offsetFields & htons(SYN)) == htons(SYN)) ? true : false;
 }
 
-// FIXME: isTcpAck function falsely returns true, eeds testing
+// TODO: isTcpAck is now fixed, but may need further testing
 bool isTcpAck(etherHeader *ether)
 {
     tcpHeader *tcp = getTcpHeaderPtr(ether);
@@ -119,7 +115,7 @@ void sendTcpPendingMessages(etherHeader *ether, socket *s)
 {
     if (arpNeeded)
     {
-        // TODO: Add timer functionality
+        // TODO: Add timer functionality to initial arp request
         uint8_t localIpAddress[4];
         uint8_t ipGwAddress[4];
 
@@ -165,7 +161,7 @@ void processTcpResponse(etherHeader *ether, socket *s)
     }
 }
 
-// TODO: Make sure this works correctly
+// TODO: Make sure processTcpArp works correctly
 // This is where we will get the hardware address
 void processTcpArpResponse(etherHeader *ether, socket *s)
 {

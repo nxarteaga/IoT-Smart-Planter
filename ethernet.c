@@ -517,6 +517,8 @@ int main(void)
     s.remoteHwAddress[5] = 0x1b;
     */
 
+    // TODO: Remove manual IP stuff once EEPROM is fixed
+
     uint8_t tempLocalIpAddress[4];
     uint8_t tempSn[4];
     uint8_t tempGw[4];
@@ -542,6 +544,7 @@ int main(void)
     setIpDnsAddress(tempGw);
 
     // Socket info
+    // TODO: Write function that does all of the socket stuff
 
     // IP
     s.remoteIpAddress[0] = tempGw[0];
