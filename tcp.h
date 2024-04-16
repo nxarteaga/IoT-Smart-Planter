@@ -84,7 +84,8 @@ bool isTcpAck(etherHeader *ether);
 
 void sendTcpPendingMessages(etherHeader *ether, socket *s);
 void processDhcpResponse(etherHeader *ether);
-void processTcpArpResponse(etherHeader *ether);
+void processTcpResponse(etherHeader *ether, socket *s);
+void processTcpArpResponse(etherHeader *ether, socket *s);
 
 void setTcpPortList(uint16_t ports[], uint8_t count);
 bool isTcpPortOpen(etherHeader *ether);

@@ -112,51 +112,72 @@ bool isTcpAck(etherHeader *ether)
     return ((tcp->offsetFields & htons(ACK)) == htons(ACK)) ? true : false;
 }
 
-// TODO: write sendTcpPendingMessages state machine
+// TODO: finish sendTcpPendingMessages state machine
 void sendTcpPendingMessages(etherHeader *ether, socket *s)
+{
+    if (arpNeeded)
+    {
+        // TODO: Add timer functionality
+        uint8_t localIpAddress[4];
+        uint8_t ipGwAddress[4];
+
+        getIpAddress(localIpAddress);
+        getIpGatewayAddress(ipGwAddress);
+        
+        sendArpRequest(ether, localIpAddress, ipGwAddress);
+        arpNeeded = false;
+    }
+    if (synNeeded)
+    {
+        sendTcpMessage(ether, s, SYN, 0, 0);
+        setTcpState(0, TCP_SYN_SENT);
+        synNeeded = false;
+    }
+    if (ackNeeded)
+    {
+        sendTcpMessage(ether, s, ACK, 0, 0);
+        setTcpState(0, TCP_ESTABLISHED);
+        ackNeeded = false;
+    }
+}
+
+// TODO: finish processTcpResponse state machine
+void processTcpResponse(etherHeader *ether, socket *s)
 {
     switch (getTcpState(0))
     {
         case TCP_CLOSED:
-            sendTcpMessage(ether, s, SYN, 0, 0);
-            setTcpState(0, TCP_SYN_SENT);
             break;
-        
         case TCP_SYN_SENT:
-            if (isTcp(ether))
+            if (isTcpAck(ether) && isTcpSyn(ether))
             {
-                sendTcpMessage(ether,s, ACK, 0, 0);
-                setTcpState(0, TCP_ESTABLISHED);
+                tcpHeader *tcp = getTcpHeaderPtr(ether);
+                s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + 1;
+                s->sequenceNumber = s->sequenceNumber + 1;
+                ackNeeded = true;
             }
             break;
-
         case TCP_ESTABLISHED:
-            setPinValue(GREEN_LED, 1);
+            setPinValue(GREEN_LED, 1); // for now turns on green LED
             break;
     }
 }
 
-// TODO: write processTcpResponse function
-void processTcpResponse(etherHeader *ether)
+// TODO: Make sure this works correctly
+// This is where we will get the hardware address
+void processTcpArpResponse(etherHeader *ether, socket *s)
 {
-    if (isTcp(ether))
+    arpPacket *arp = (arpPacket*)ether->data;
+    uint8_t i;
+
+    for (i = 0; i < HW_ADD_LENGTH; i++)
     {
-        if (isTcpSyn(ether))
-        {
-            // do something
-        }
-        if (isTcpAck(ether))
-        {
-            // do something
-        }
+        s->remoteHwAddress[i] = arp->sourceAddress[i];
     }
-}
-
-// TODO: write processTcpArpResponse function
-// This is where we will get the MAC and IP addresses
-void processTcpArpResponse(etherHeader *ether)
-{
-
+    
+    ackNeeded = false;
+    arpNeeded = false;
+    synNeeded = true;
 }
 
 // TODO: write setTcpPortList function
