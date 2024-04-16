@@ -22,7 +22,9 @@
 #include "arp.h"
 #include "tcp.h"
 #include "timer.h"
-#include "gpio.h"
+#include "led_builtin.h" // just for debugging, remove when finished
+
+#define MAX_TCP_PORTS 4
 
 //-----------------------------------------------------------------------------
 //  Globals
@@ -158,7 +160,7 @@ void processTcpResponse(etherHeader *ether, socket *s)
             }
             break;
         case TCP_ESTABLISHED:
-            setPinValue(GREEN_LED, 1); // for now turns on green LED
+            enableGreenLED();
             break;
     }
 }
