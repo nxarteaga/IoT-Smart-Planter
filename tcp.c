@@ -136,6 +136,7 @@ void sendTcpPendingMessages(etherHeader *ether, socket *s)
         sendTcpMessage(ether, s, ACK, 0, 0);
         setTcpState(0, TCP_ESTABLISHED);
         ackNeeded = false;
+        enableAllLEDs();
     }
 }
 
@@ -156,7 +157,6 @@ void processTcpResponse(etherHeader *ether, socket *s)
             }
             break;
         case TCP_ESTABLISHED:
-            enableGreenLED();
             break;
     }
 }
@@ -250,7 +250,7 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
     // Sets data option and flag bits
     tcp->offsetFields = htons(((sizeof(tcpHeader) / 4) << OFS_SHIFT) | flags);
 
-    tcp->windowSize = htons(1522); //how far back I can look to give you stuff that is missing. Small window due to constrains in the redboard.
+    tcp->windowSize = htons(1500); //how far back I can look to give you stuff that is missing. Small window due to constrains in the redboard.
     // changed it to 1500 based on Dr. Losh comments during lecture -r
 
     tcp->urgentPointer = htons(0);
