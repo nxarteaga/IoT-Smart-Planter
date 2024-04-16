@@ -480,6 +480,7 @@ int main(void)
     setEtherMacAddress(2, 3, 4, 5, 6, 0x79);
 
     // Init EEPROM
+    // FIXME: EEPROM is seemingly not storing values between resets?
     initEeprom();
     readConfiguration();
 
@@ -490,16 +491,10 @@ int main(void)
 
     disableDhcp();
 
+    /*
     // Hardcoded socket variables for testing
 
-    // IP
-    s.remoteIpAddress[0] = 192;
-    s.remoteIpAddress[1] = 168;
-    s.remoteIpAddress[2] = 1;
-    s.remoteIpAddress[3] = 163;
-
     // MAC Address
-    /*
     // Pi - b8:27:eb:19:cc:81
     s.remoteHwAddress[0] = 0xb8;
     s.remoteHwAddress[1] = 0x27;
@@ -507,7 +502,6 @@ int main(void)
     s.remoteHwAddress[3] = 0x19;
     s.remoteHwAddress[4] = 0xcc;
     s.remoteHwAddress[5] = 0x81;
-    */
     // Laptop - xx:xx:xx:xx:xx:xx
     s.remoteHwAddress[0] = 0x0;
     s.remoteHwAddress[1] = 0x0;
@@ -515,7 +509,6 @@ int main(void)
     s.remoteHwAddress[3] = 0x0;
     s.remoteHwAddress[4] = 0x0;
     s.remoteHwAddress[5] = 0x0;
-    /*
     // Lab - 3c:37:86:f8:a1:1b
     s.remoteHwAddress[0] = 0x3c;
     s.remoteHwAddress[1] = 0x37;
@@ -525,9 +518,41 @@ int main(void)
     s.remoteHwAddress[5] = 0x1b;
     */
 
+    uint8_t tempLocalIpAddress[4];
+    uint8_t tempSn[4];
+    uint8_t tempGw[4];
+
+    tempLocalIpAddress[0] = 192;
+    tempLocalIpAddress[1] = 168;
+    tempLocalIpAddress[2] = 1;
+    tempLocalIpAddress[3] = 121;
+
+    tempSn[0] = 255;
+    tempSn[1] = 255;
+    tempSn[2] = 255;
+    tempSn[3] = 0;
+
+    tempGw[0] = 192;
+    tempGw[1] = 168;
+    tempGw[2] = 1;
+    tempGw[3] = 163;
+
+    setIpAddress(tempLocalIpAddress);
+    setIpSubnetMask(tempSn);
+    setIpGatewayAddress(tempGw);
+    setIpDnsAddress(tempGw);
+
+    // Socket info
+
+    // IP
+    s.remoteIpAddress[0] = tempGw[0];
+    s.remoteIpAddress[1] = tempGw[1];
+    s.remoteIpAddress[2] = tempGw[2];
+    s.remoteIpAddress[3] = tempGw[3];
+
     // Ports
     s.remotePort = 1883; // MQTT Port
-    s.localPort = get_random_in_range(); // Gets random port
+    s.localPort = 50002; // Gets random port, start at 50000 for testing
 
     // SEQ/ACK Nums
     s.sequenceNumber = htonl(1); // Starts at 1
@@ -600,7 +625,7 @@ int main(void)
             if (isArpResponse(data))
             {
                 processDhcpArpResponse(data);
-                processTcpArpResponse(data);
+                processTcpArpResponse(data, &s);
             }
 
             // Handle IP datagram
@@ -629,6 +654,7 @@ int main(void)
                     // Handle TCP datagram
                     if (isTcp(data))
                     {
+                        processTcpResponse(data, &s);
                         if (isTcpPortOpen(data))
                         {
                         }
