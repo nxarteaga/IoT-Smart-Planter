@@ -56,6 +56,7 @@
 #include "tcp.h"
 #include "dhcp.h"
 #include "mqtt.h"
+#include "random.h"
 
 // Pins
 #define RED_LED PORTF,1
@@ -63,8 +64,8 @@
 #define GREEN_LED PORTF,3
 #define PUSH_BUTTON PORTF,4
 
-// EEPROM Map  Number corresponds to address of EEPROM
-#define EEPROM_DHCP        1       // Are we DHCP enable or not
+// EEPROM Map
+#define EEPROM_DHCP        1
 #define EEPROM_IP          2
 #define EEPROM_SUBNET_MASK 3
 #define EEPROM_GATEWAY     4
@@ -455,7 +456,6 @@ void processShell()
 
 int main(void)
 {
-    // char str[40];
     uint8_t* udpData;
     uint8_t buffer[MAX_PACKET_SIZE];
     etherHeader *data = (etherHeader*) buffer;
@@ -472,65 +472,12 @@ int main(void)
     initTimer();
 
     // Init sockets
-    //initSockets();
+    initSockets();
 
     // Init ethernet interface (eth0)
     putsUart0("\nStarting eth0\n");
     initEther(ETHER_UNICAST | ETHER_BROADCAST | ETHER_HALFDUPLEX);
     setEtherMacAddress(2, 3, 4, 5, 6, 0x79);
-    disableDhcp();
-
-    /*
-    // Setting static IP (no DHCP) at home
-    uint8_t homeIpAddr[4] = {192, 168, 0, 122};
-    uint8_t homeSubNet[4] = {255, 255, 255, 0};
-    uint8_t homeGwAddr[4] = {192, 168, 0, 1};
-    setIpAddress(myIpAddr);
-    setIpSubnetMask(mySubNet);
-    setIpGatewayAddress(myGwAddr);
-    setIpDnsAddress(myGwAddr);
-    */
-
-    /*
-    // Setting static IP in lab
-    uint8_t labIpAddr[4] = {192, 168, 1, 121};
-    uint8_t labSubNet[4] = {255, 255, 255, 0};
-    uint8_t labGwAddr[4] = {192, 168, 1, 1};
-    setIpAddress(myIpAddr);
-    setIpSubnetMask(mySubNet);
-    setIpGatewayAddress(myGwAddr);
-    setIpDnsAddress(myGwAddr);
-    */
-
-    // socket stuff for my router
-    // ip
-    s.remoteIpAddress[0] = 192;
-    s.remoteIpAddress[1] = 168;
-    s.remoteIpAddress[2] = 0;
-    s.remoteIpAddress[3] = 1;
-
-    // hw
-    // not incl. as to not get ddos'd lol
-
-    /*
-    // Pi - b8:27:eb:19:cc:81
-    s.remoteHwAddress[0] = 0xb8;
-    s.remoteHwAddress[1] = 0x27;
-    s.remoteHwAddress[2] = 0xeb;
-    s.remoteHwAddress[3] = 0x19;
-    s.remoteHwAddress[4] = 0xcc;
-    s.remoteHwAddress[5] = 0x81;
-    */
-
-    // ports
-    s.remotePort = 50000;
-    s.localPort = 1;
-
-    // seq/ack nums
-    s.sequenceNumber = 1000;
-    s.acknowledgementNumber = 0;
-
-    s.state = 0;
 
     // Init EEPROM
     initEeprom();
@@ -541,6 +488,57 @@ int main(void)
     setPinValue(GREEN_LED, 0);
     waitMicrosecond(100000);
 
+    disableDhcp();
+
+    // Hardcoded socket variables for testing
+
+    // IP
+    s.remoteIpAddress[0] = 192;
+    s.remoteIpAddress[1] = 168;
+    s.remoteIpAddress[2] = 1;
+    s.remoteIpAddress[3] = 163;
+
+    // MAC Address
+    /*
+    // Pi - b8:27:eb:19:cc:81
+    s.remoteHwAddress[0] = 0xb8;
+    s.remoteHwAddress[1] = 0x27;
+    s.remoteHwAddress[2] = 0xeb;
+    s.remoteHwAddress[3] = 0x19;
+    s.remoteHwAddress[4] = 0xcc;
+    s.remoteHwAddress[5] = 0x81;
+    */
+    // Laptop - xx:xx:xx:xx:xx:xx
+    s.remoteHwAddress[0] = 0x0;
+    s.remoteHwAddress[1] = 0x0;
+    s.remoteHwAddress[2] = 0x0;
+    s.remoteHwAddress[3] = 0x0;
+    s.remoteHwAddress[4] = 0x0;
+    s.remoteHwAddress[5] = 0x0;
+    /*
+    // Lab - 3c:37:86:f8:a1:1b
+    s.remoteHwAddress[0] = 0x3c;
+    s.remoteHwAddress[1] = 0x37;
+    s.remoteHwAddress[2] = 0x86;
+    s.remoteHwAddress[3] = 0xf8;
+    s.remoteHwAddress[4] = 0xa1;
+    s.remoteHwAddress[5] = 0x1b;
+    */
+
+    // Ports
+    s.remotePort = 1883; // MQTT Port
+    s.localPort = get_random_in_range(); // Gets random port
+
+    // SEQ/ACK Nums
+    s.sequenceNumber = htonl(1); // Starts at 1
+    s.acknowledgementNumber = htonl(0); // Will be set by the server
+
+    // State
+    s.state = TCP_CLOSED; // Closed on startup
+
+    /*
+    // hardcoding everything here
+
     getEtherPacket(data, MAX_PACKET_SIZE);
 
     sendTcpMessage(data, &s, SYN, 0, 0);
@@ -549,13 +547,19 @@ int main(void)
     {
         getEtherPacket(data, MAX_PACKET_SIZE);
         processShell();
+        if (isArpRequest(data))
+        {
+            sendArpResponse(data);
+        }
         if (isTcp(data))
         {
+            sendTcpMessage(data, &s, ACK, 0, 0);
             setPinValue(GREEN_LED, 1);
+            while(1);
         }
     }
-
-    /*
+}
+*/
     // Main Loop
     // RTOS and interrupts would greatly improve this code,
     // but the goal here is simplicity
@@ -571,7 +575,7 @@ int main(void)
         }
 
         // TCP pending messages
-        sendTcpPendingMessages(data);
+        sendTcpPendingMessages(data, &s);
 
         // Packet processing
         if (isEtherDataAvailable())
@@ -610,7 +614,7 @@ int main(void)
                         sendPingResponse(data);
                     }
 
-                     //Handle UDP datagram
+                    // Handle UDP datagram
                     if (isUdp(data))
                     {
                         udpData = getUdpData(data);
@@ -642,6 +646,4 @@ int main(void)
             }
         }
     }
-    */
 }
-
