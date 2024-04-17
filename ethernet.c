@@ -56,6 +56,7 @@
 #include "tcp.h"
 #include "dhcp.h"
 #include "mqtt.h"
+#include "plant.h"
 
 // Pins
 #define RED_LED PORTF,1
@@ -449,6 +450,25 @@ void processShell()
 // Main
 //-----------------------------------------------------------------------------
 
+int main(void)
+{
+    // Init controller
+    initHw();
+
+    // Setup UART0
+    initUart0();
+    setUart0BaudRate(115200, 40e6);
+
+    initBH1750();
+
+    while (true)
+    {
+        snprintf(strInput, sizeof(strInput), "Lux: %"PRIu16"\n", getBH1750Lux());
+        putsUart0(strInput);
+    }
+}
+
+/*
 // Max packet is calculated as:
 // Ether frame header (18) + Max MTU (1500)
 #define MAX_PACKET_SIZE 1518
@@ -489,6 +509,7 @@ int main(void)
     waitMicrosecond(100000);
 
     disableDhcp();
+    */
 
     /*
     // Hardcoded socket variables for testing
@@ -516,7 +537,8 @@ int main(void)
     s.remoteHwAddress[4] = 0xa1;
     s.remoteHwAddress[5] = 0x1b;
     */
-
+    
+    /*
     // TODO: Remove manual IP stuff once EEPROM is fixed
 
     uint8_t tempLocalIpAddress[4];
@@ -563,7 +585,6 @@ int main(void)
     // State
     s.state = TCP_CLOSED; // Closed on startup
 
-    /*
     // hardcoding everything here
 
     getEtherPacket(data, MAX_PACKET_SIZE);
@@ -586,7 +607,6 @@ int main(void)
         }
     }
 }
-*/
     // Main Loop
     // RTOS and interrupts would greatly improve this code,
     // but the goal here is simplicity
@@ -675,3 +695,4 @@ int main(void)
         }
     }
 }
+*/
