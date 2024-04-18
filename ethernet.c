@@ -501,10 +501,10 @@ int main(void)
 //    address[1] = 254;
 //    address[2] = 90;
 //    address[3] = 46;
-    address[0] = 10;
-    address[1] = 37;
-    address[2] = 129;
-    address[3] = 10;
+    address[0] = 169;
+    address[1] = 254;
+    address[2] = 135;
+    address[3] = 145;
 //    address[0] = 192;
 //      address[1] = 168;
 //      address[2] = 2;
@@ -580,11 +580,14 @@ int main(void)
                         if (isTcpPortOpen(data))
                         {
 
-                             processTcpResponse(data);
+                           // isSYN_ACK(data);
+                           processTcpResponse(data);
                             // processTcpResponse
                         }
-                        else
+                        else{
                             sendTcpResponse(data, &s, ACK | RST);
+                        }
+
                     }
                 }
             	// Handle DHCP response

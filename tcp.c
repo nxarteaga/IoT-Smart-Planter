@@ -31,6 +31,7 @@
 
 #define MAX_TCP_PORTS 4
 #define TCP 6
+#define FIN_ACK 0x0011
 #define idk 0010000000000000
 //// TCP states
 //#define TCP_CLOSED 0
@@ -45,12 +46,16 @@
 //#define TCP_LAST_ACK 9
 //#define TCP_TIME_WAIT 10
 bool SYN_ACK_RECEIVED = false;
+bool FIN_ACK_RECEIVED_GoToCloseWait = false;
+bool remainClosed = false;
+uint32_t finAcknowledgementValue =0;
+uint32_t finSequenceValue = 0;
 uint16_t tcpPorts[MAX_TCP_PORTS];
 uint8_t tcpPortCount = 0;
 uint8_t tcpState[MAX_TCP_PORTS];
 uint32_t sequenceNumber = 0;// This might need to be randomly generated. Sequences should not start with value of zero as they become vulnerable to attacks.
 uint32_t sourcePort = 4910; //MQTT address is 127.0.0.1
-uint32_t remotePort = 8080;
+uint32_t remotePort = 1883;
 uint32_t ack = 0;
 
 char str[40];
@@ -69,8 +74,54 @@ char str[40];
 // Subroutines
 //-----------------------------------------------------------------------------
 
+//similar to getOptions in DHCP. Getting ptr of TCP
+uint8_t *getTCPHeaderPtr(etherHeader *ether)
+{
+    ipHeader *ip = (ipHeader*)ether->data;
+    //uint8_t ipHeaderLength = ip->size * 4;
+    //TCP header frame
+    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip+(ip->size*4));
+    return (uint8_t*)tcp;
+}
 
+void isSYN_ACK(etherHeader *ether){
+    tcpHeader *tcp = (tcpHeader*)getTCPHeaderPtr(ether);
+       if((htons(tcp->offsetFields) & ACK ) && (htons(tcp->offsetFields) & SYN))
+       {
+           SYN_ACK_RECEIVED = true;
+           //return true;
+       }
 
+       //return false;
+}
+
+void processTcpResponse(etherHeader *ether)
+{
+    tcpHeader *tcp = (tcpHeader*)getTCPHeaderPtr(ether);
+    if((htons(tcp->offsetFields) & ACK ) && (htons(tcp->offsetFields) & SYN))
+    {
+        SYN_ACK_RECEIVED = true;
+    }else if((htons(tcp->offsetFields) & ACK ) && (htons(tcp->offsetFields) & FIN))
+    {
+        finAcknowledgementValue = tcp->sequenceNumber + htonl(1);
+        finSequenceValue = tcp->acknowledgementNumber;
+        FIN_ACK_RECEIVED_GoToCloseWait = true;
+        setTcpState(0, TCP_CLOSE_WAIT);
+    }else if((htons(tcp->offsetFields) & ACK ) && (getTcpState(0) == TCP_LAST_ACK))
+    {
+
+        if(tcp->sequenceNumber == finSequenceValue && tcp->acknowledgementNumber == finAcknowledgementValue){
+            remainClosed = true;
+            setTcpState(0, TCP_CLOSED);
+        }
+
+    }
+}
+
+void closeTCPconnection()
+{
+
+}
 
 
 // Set TCP state
@@ -109,15 +160,7 @@ bool isTcpSyn(etherHeader *ether)
 
 
 
-//similar to getOptions in DHCP. Getting ptr of TCP
-uint8_t *getTCPHeaderPtr(etherHeader *ether)
-{
-    ipHeader *ip = (ipHeader*)ether->data;
-    //uint8_t ipHeaderLength = ip->size * 4;
-    //TCP header frame
-    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip+(ip->size*4));
-    return (uint8_t*)tcp;
-}
+
 
 
 
@@ -141,90 +184,6 @@ void establishSocket(etherHeader *ether,uint8_t ipFrom[], uint8_t ipTo[])
     sendArpRequest(ether,ipFrom,ipTo);
 }
 
-void sendACK(etherHeader *ether, socket * s)
-{
-    uint16_t tcpHeaderLength = 0;
-      uint8_t localHwAddress[6];
-      uint8_t localIpAddress[4];
-      uint8_t i =0;
-      uint32_t sum;
-      uint16_t tmp16;
-      uint16_t tcpLength = 0;
-
-      //Part of ethernet Frame
-      getEtherMacAddress(localHwAddress);
-      for(i = 0; i < HW_ADD_LENGTH;i++)
-      {
-          //ether->destAddress[i] = ; //Need to figure this one out. Maybe socket *s?
-          ether->destAddress[i] = s->remoteHwAddress[i];
-          ether->sourceAddress[i] = localHwAddress[i];
-      }
-      ether->frameType = htons(TYPE_IP);
-
-      // IP header
-      ipHeader* ip = (ipHeader*)ether->data;
-      ip->rev = 0x4;
-      ip->size = 0x5;
-      ip->typeOfService = 0;
-      ip->id = 0;
-      ip->flagsAndOffset = 0;
-      ip->ttl = 64; //64 | 128? I think, not sure.verify!!!
-      ip->protocol = PROTOCOL_TCP;
-      ip->headerChecksum = 0;
-      uint8_t ipHeaderLength = ip->size * 4;
-      getIpAddress(localIpAddress);
-      for(i = 0; i < IP_ADD_LENGTH; i++)
-      {
-          ip->sourceIp[i] = localIpAddress[i];
-          ip->destIp[i] = s->remoteIpAddress[i]; //once again this might be with socket variable *s
-      }
-
-      //TCP header frame
-      tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip+(ip->size*4));
-      tcp->sourcePort = htons(s->localPort); //use htons here?
-      tcp->destPort = htons(s->remotePort); //
-      tcp->sequenceNumber = htonl(s->sequenceNumber);//
-      tcp->acknowledgementNumber = htonl(s->sequenceNumber);
-      //tcp->acknowledgementNumber = htonl(ack);
-      tcp->windowSize = htons(1);//htons(0); //how far back I can look to give you stuff that is missing. Small window due to constrains in the redboard.
-      tcp->urgentPointer = 0;
-      tcp->offsetFields = 0;
-
-      setFlags(tcp->offsetFields,ACK);
-      //tcpLength = sizeof(tcpHeader)+dataSize;
-      tcpLength = sizeof(tcpHeader);
-
-
-      tcp->offsetFields &= ~(0xF000);
-      tcpHeaderLength = ((sizeof(tcpHeader)/4) << OFS_SHIFT);
-
-      tcp->offsetFields |= tcpHeaderLength;
-      tcp->offsetFields =htons(tcp->offsetFields);
-
-
-
-      ip->length = htons(sizeof(ipHeader)+tcpLength);
-         // 32-bit sum over ip header
-         calcIpChecksum(ip);
-         // set udp length
-        // udp->length = htons(udpLength);
-
-
-         // 32-bit sum over pseudo-header
-         sum = 0;
-         sumIpWords(ip->sourceIp, 8, &sum);
-         tmp16 = ip->protocol;
-         sum += (tmp16 & 0xff) << 8;
-         tmp16 = htons(tcpLength);
-         sumIpWords(&tmp16, 2, &sum);
-         // add udp header
-         tcp->checksum = 0;
-         sumIpWords(tcp, tcpLength, &sum);
-         tcp->checksum = getIpChecksum(sum);
-         putEtherPacket(ether, sizeof(etherHeader) + ipHeaderLength + tcpLength);
-
-}
-
 
 void sendTcpPendingMessages(etherHeader *ether)
 {
@@ -238,18 +197,19 @@ void sendTcpPendingMessages(etherHeader *ether)
   // uint8_t i = 0;
 //
   //// case TCP_CLOSED;
-  // uint8_t serverIp[IP_ADD_LENGTH]={169,254,90,42};
+   uint8_t serverIp[IP_ADD_LENGTH]={169,254,135,137};
 //  uint8_t serverIp[IP_ADD_LENGTH]={192,168,2,1};
-   uint8_t serverIp[IP_ADD_LENGTH]={10,211,55,3};
+   //uint8_t serverIp[IP_ADD_LENGTH]={10,37,129,2};
    //uint8_t serverIp[IP_ADD_LENGTH]={127,0,0,1};
-  // uint8_t remoteHwAddress[HW_ADD_LENGTH] = {0x0C,0xE4,0x41,0xF0,0xF3,0x77};//Remote address of M1
-   uint8_t remoteHwAddress[HW_ADD_LENGTH] = {0x00,0x1C,0x42,0xC4,0x34,0x47}; //Remote address of Virtual machine
+   //uint8_t remoteHwAddress[HW_ADD_LENGTH] = {0x0C,0xE4,0x41,0xF0,0xF3,0x77};//Remote address of M1
+   uint8_t remoteHwAddress[HW_ADD_LENGTH] = {0x00,0xE0,0x4C,0x68,0x4D,0x50}; //Bridge
+  // uint8_t remoteHwAddress[HW_ADD_LENGTH] = {0x00,0x1C,0x42,0xC4,0x34,0x47}; //Remote address of Virtual machine
 
   // uint8_t remoteHwAddress[HW_ADD_LENGTH] = {0xD4,0x5D,0x64,0xB2,0x1F,0x41}; //PC
 
 
 
-           if(getTcpState(0) == TCP_CLOSED){
+           if(getTcpState(0) == TCP_CLOSED &&(remainClosed == false)){
 
                for(i = 0; i < IP_ADD_LENGTH; i++)
                {
@@ -293,9 +253,44 @@ void sendTcpPendingMessages(etherHeader *ether)
            {
                //putsUart0("\nEstablish state\n");
                //send subscribed topics in here?
+           }else if(getTcpState(0) == TCP_FIN_WAIT_1)
+           {
+              // datasize = 0;
+              // data = 0;
+               //sendTcpMessage(ether, &soc, FIN, data, dataSize);
            }
+           else if(getTcpState(0) == TCP_FIN_WAIT_2)
+           {
 
+           }else if(getTcpState(0) == TCP_CLOSING)
+           {
 
+           }else if((getTcpState(0) == TCP_CLOSE_WAIT) && (FIN_ACK_RECEIVED_GoToCloseWait == true)) //Passive Close
+           {
+//               data = 0;
+               dataSize = 0;
+
+               soc.acknowledgementNumber = finAcknowledgementValue;
+               soc.sequenceNumber = finSequenceValue;
+
+               sendTcpMessage(ether, &soc, ACK, data, dataSize);
+               setTcpState(0, TCP_LAST_ACK);
+
+           }
+           else if(getTcpState(0) == TCP_LAST_ACK)  //Passive Close
+           {
+//               data = 0;
+               dataSize = 0;
+               soc.acknowledgementNumber = finAcknowledgementValue;
+               soc.sequenceNumber = finSequenceValue;
+
+               sendTcpMessage(ether, &soc, FIN_ACK, data, dataSize);
+//               remainClosed = true;
+
+           }else if(getTcpState(0) == TCP_TIME_WAIT)
+           {
+
+           }
 
 }
 
@@ -309,6 +304,8 @@ void processTcpArpResponse(etherHeader *ether) //if we are not given hardware ad
 void setTcpPortList(uint16_t ports[], uint8_t count)
 {
 }
+
+
 
 bool isTcpPortOpen(etherHeader *ether)
 {
@@ -422,11 +419,4 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
        sequenceNumber += dataSize;
 
 }
-void processTcpResponse(etherHeader *ether)
-{
-    tcpHeader *tcp = (tcpHeader*)getTCPHeaderPtr(ether);
-    if((htons(tcp->offsetFields) & ACK ) && (htons(tcp->offsetFields) & SYN))
-    {
-        SYN_ACK_RECEIVED = true;
-    }
-}
+

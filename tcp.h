@@ -51,6 +51,7 @@ typedef struct _tcpHeader // 20 or more bytes
 #define TCP_TIME_WAIT 10
 
 // TCP offset/flags
+
 #define FIN 0x0001
 #define SYN 0x0002
 #define RST 0x0004
@@ -87,6 +88,7 @@ bool isTcpAck(etherHeader *ether);
 void sendTcpPendingMessages(etherHeader *ether);
 void processDhcpResponse(etherHeader *ether);
 void processTcpArpResponse(etherHeader *ether);
+void processTcpResponse(etherHeader *ether);
 
 void setTcpPortList(uint16_t ports[], uint8_t count);
 bool isTcpPortOpen(etherHeader *ether);
