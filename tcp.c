@@ -165,17 +165,18 @@ void processTcpResponse(etherHeader *ether, socket *s)
 // This is where we will get the hardware address
 void processTcpArpResponse(etherHeader *ether, socket *s)
 {
+    if (getTcpState(0) == TCP_CLOSED)
+{
     arpPacket *arp = (arpPacket*)ether->data;
     uint8_t i;
 
     for (i = 0; i < HW_ADD_LENGTH; i++)
     {
         s->remoteHwAddress[i] = arp->sourceAddress[i];
-    }
-    
-    ackNeeded = false;
-    arpNeeded = false;
+        }
+        
     synNeeded = true;
+    }
 }
 
 // TODO: write setTcpPortList function
