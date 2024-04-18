@@ -73,7 +73,6 @@ bool isTcp(etherHeader* ether)
     ipHeader* ip = (ipHeader*)ether->data;
     uint8_t localHwAddress[6];
     uint8_t i = 0;
-    bool ok = true;
 
     getEtherMacAddress(localHwAddress);
 
@@ -83,17 +82,13 @@ bool isTcp(etherHeader* ether)
         {
             if (ether->destAddress[i] != localHwAddress[i])
             {
-                ok = false;
-                break;
+                return false;
             }
         }
-    }
-    else
-    {
-        ok = false;
+        return true;
     }
     
-    return ok;
+    return false;
 }
 
 // TODO: isTcpSyn is now fixed, but may need further testing
@@ -166,16 +161,16 @@ void processTcpResponse(etherHeader *ether, socket *s)
 void processTcpArpResponse(etherHeader *ether, socket *s)
 {
     if (getTcpState(0) == TCP_CLOSED)
-{
-    arpPacket *arp = (arpPacket*)ether->data;
-    uint8_t i;
-
-    for (i = 0; i < HW_ADD_LENGTH; i++)
     {
-        s->remoteHwAddress[i] = arp->sourceAddress[i];
+        arpPacket *arp = (arpPacket*)ether->data;
+        uint8_t i;
+
+        for (i = 0; i < HW_ADD_LENGTH; i++)
+        {
+            s->remoteHwAddress[i] = arp->sourceAddress[i];
         }
         
-    synNeeded = true;
+        synNeeded = true;        
     }
 }
 
@@ -272,9 +267,6 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
     // 32-bit sum over ip header
     calcIpChecksum(ip);
 
-    // set tcp length
-    // no length in tcp struct
-
     // 32-bit sum over pseudo-header
     sum = 0;
     sumIpWords(ip->sourceIp, 8, &sum);
@@ -288,8 +280,6 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
     sumIpWords(tcp, tcpLength, &sum);
     tcp->checksum = getIpChecksum(sum);
 
-    // send packet with size = ether + udp hdr + ip header + udp_size
+    // send packet
     putEtherPacket(ether, sizeof(etherHeader) + ipHeaderLength + tcpLength);
-
-
 }
