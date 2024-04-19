@@ -58,6 +58,8 @@
 #include "mqtt.h"
 #include "plant.h"
 
+#include "led_builtin.h"
+
 // Pins
 #define RED_LED PORTF,1
 #define BLUE_LED PORTF,2
@@ -459,12 +461,24 @@ int main(void)
     initUart0();
     setUart0BaudRate(115200, 40e6);
 
-    initBH1750();
+    // initBH1750();
+    initDHT22();
+
+    if (readDHT22Data())
+    {
+        enableGreenLED();
+    }
+    else
+    {
+        enableRedLED();
+    }
 
     while (true)
     {
+        /*
         snprintf(strInput, sizeof(strInput), "Lux: %"PRIu16"\n", getBH1750Lux());
         putsUart0(strInput);
+        */
     }
 }
 

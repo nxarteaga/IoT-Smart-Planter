@@ -22,7 +22,14 @@
 
 // Functions ------------------------------------------------------------------
 
+// BH1750
 void initBH1750(void);
 uint16_t getBH1750Lux(void);
+
+// DHT22
+void initDHT22(void);
+bool readDHT22Data(void);
+uint16_t getDHT22Temp(void);
+uint16_t getDHT22Hum(void);
 
 #endif
