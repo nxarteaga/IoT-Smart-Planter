@@ -20,6 +20,13 @@
 
 // Structures -----------------------------------------------------------------
 
+typedef struct _dht22Data
+{
+  uint16_t hum;
+  uint16_t temp;
+  uint8_t checksum;
+} dht22Data;
+
 // Functions ------------------------------------------------------------------
 
 // BH1750
@@ -28,7 +35,7 @@ uint16_t getBH1750Lux(void);
 
 // DHT22
 void initDHT22(void);
-bool readDHT22Data(void);
+bool readDHT22Data(dht22Data *data);
 uint16_t getDHT22Temp(void);
 uint16_t getDHT22Hum(void);
 

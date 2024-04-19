@@ -463,15 +463,9 @@ int main(void)
 
     // initBH1750();
     initDHT22();
+    uint16_t data[3];
 
-    if (readDHT22Data())
-    {
-        enableGreenLED();
-    }
-    else
-    {
-        enableRedLED();
-    }
+    getDHT22Temp();
 
     while (true)
     {

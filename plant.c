@@ -91,39 +91,77 @@ void initDHT22(void)
 }
 
 // Reads and stores the 40 bits of data from the DHT22 sensor
-bool readDHT22Data(uint16_t *data)
+bool readDHT22Data(dht22Data *data)
 {
     bool ok = false;
+    volatile uint8_t mask = 0;
+    volatile uint8_t counter = 0;
+
+
+    volatile bool data_bits[40];
+    uint8_t i = 0;
+    for (i = 0; i < 40; i++)
+    {
+        data_bits[i] = 0;
+    }
+    volatile uint8_t counter_high_seg[40];
+    volatile uint8_t counter_low_seg[40];
+    volatile uint8_t counter_high = 0;
+    volatile uint8_t counter_low = 0;
+
 
     // Sends start signal to the sensor
     setPinValue(DH_OUT_PIN, 0);
     waitMicrosecond(1000);
     setPinValue(DH_OUT_PIN, 1);
-    waitMicrosecond(20);
+    waitMicrosecond(25);
 
     // Receive ready signal from sensor
     selectPinDigitalInput(DH_OUT_PIN); // Input mode to receive data
-    waitMicrosecond(40);
+    waitMicrosecond(35);
     bool ready_low = getPinValue(DH_OUT_PIN); // Expecting low value
-    waitMicrosecond(80);
+    waitMicrosecond(70);
     bool ready_high = getPinValue(DH_OUT_PIN); // Expecting high value
-    waitMicrosecond(40);
+    waitMicrosecond(50);
 
     // Checks if ready signals were correct
     if (!ready_low && ready_high)
     {
         ok = true;
+        enableGreenLED();
     }
 
     // Begin data transmission if ready signal was correct
     if (ok)
     {
+        for (mask = 0; mask < 40; mask++)
+        {
+            while (!getPinValue(DH_OUT_PIN))
+            {
+                counter_low++;
+            }
+            counter_low_seg[mask] = counter_low;
+            counter_low = 0;
 
+            while (getPinValue(DH_OUT_PIN))
+            {
+                counter_high++;
+            }
+            if (counter_high > 50)
+            {
+                data->hum |= (mask << 1);
+                data_bits[mask] = 1;
+            }
+            counter_high_seg[mask] = counter_high;
+            counter_high = 0;
+        }
     }
 
     // Outputs 1 as to wait for next data transmission
     selectPinPushPullOutput(DH_OUT_PIN);
     setPinValue(DH_OUT_PIN, 1);
+
+    // checksum calc goes here
 
     return ok;
 }
@@ -131,10 +169,10 @@ bool readDHT22Data(uint16_t *data)
 // Gets the temperature in Celcius from the DHT22 sensor
 uint16_t getDHT22Temp(void)
 {
-    uint16_t temp = 0;
-    uint16_t data[3];
+    uint32_t temp;
+    dht22Data data;
 
-    if(readDHT22Data())
+    if(readDHT22Data(&data))
     {
     }
 
@@ -144,11 +182,12 @@ uint16_t getDHT22Temp(void)
 // Gets the humidity in percentage from the DHT22 sensor
 uint16_t getDHT22Hum(void)
 {
-    uint16_t humidity = 0;
+    uint16_t hum = 0;
+    uint16_t data[3];
 
-    if (readDHT22Data())
+    if (readDHT22Data(&data))
     {
     }
 
-    return humidity;
+    return hum;
 }
