@@ -461,19 +461,36 @@ int main(void)
     initUart0();
     setUart0BaudRate(115200, 40e6);
 
+    initSoilMoisture();
+
+    /*
     // initBH1750();
     initDHT22();
-    uint16_t data[3];
 
-    getDHT22Temp();
+    float temp = getDHT22Temp();
 
+    waitMicrosecond(2e6);
+
+    float hum = getDHT22Hum();
+
+    while(true);
+    */
+
+
+    while(1)
+    {
+        snprintf(strInput, sizeof(strInput), "Moist: %f\n", getSoilMoisture());
+        putsUart0(strInput);
+        waitMicrosecond(1e6);
+    }
+
+    /*
     while (true)
     {
-        /*
         snprintf(strInput, sizeof(strInput), "Lux: %"PRIu16"\n", getBH1750Lux());
         putsUart0(strInput);
-        */
     }
+    */
 }
 
 /*
