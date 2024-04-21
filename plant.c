@@ -43,9 +43,6 @@
 
 // Defines --------------------------------------------------------------------
 
-// Preprocessor directives
-#define DH_PRINT_ERRORS     // Print debug messages for DHT22 sensor
-
 // BH1750 Ambient Light Sensor
 #define BH_ADDRESS_VCC  0x5C    // Address when ADDR connected to VCC
 #define BH_ADDRESS_GND  0x23    // Address when ADDR connected to GND
@@ -98,6 +95,7 @@ typedef struct _dht22Data
 
 // BH1750 Ambient Light Sensor
 // TODO: Use 120ms timer for BH1750
+// TODO: Add i2c error checking
 // FIXME: Move BH1750 to I2C1 as it conflicts with ether
 
 // Initializes the BH1750 Ambient Light sensor
@@ -165,6 +163,7 @@ bool readDHT22Data(dht22Data *data)
     volatile uint8_t mask = 0;
     volatile uint8_t count = 0;
 
+    // Variables used for debugging, will get removed on final version
     volatile bool data_bits[40];
     uint8_t i = 0;
     for (i = 0; i < 40; i++)
@@ -175,7 +174,6 @@ bool readDHT22Data(dht22Data *data)
     volatile uint8_t counter_low_seg[40];
     volatile uint8_t counter_high = 0;
     volatile uint8_t counter_low = 0;
-
 
     // Sends start signal to the sensor
     setPinValue(DH_OUT_PIN, 0);
@@ -215,7 +213,7 @@ bool readDHT22Data(dht22Data *data)
             {
                 counter_high++;
             }
-            // If the signal is high for more than 50 cycles, its 1
+            // If the signal is high for more than 50 cycles, it's 1
             if (counter_high > 50)
             {
                 // Humidity bitmask
@@ -245,7 +243,7 @@ bool readDHT22Data(dht22Data *data)
         // Broken up to make it easier to read
         // Checksum =
         // ((h & 0xFF) + (h & 0xFF00 >> 8) + (t & 0xFF) + (t & 0xFF00 >> 8)) & 0xFF
-        uint8_t check = 0;
+        uint16_t check = 0;
         check = (data->hum & 0xFF) + ((data->hum & 0xFF00) >> 8);
         check = check + (data->temp & 0xFF) + ((data->temp & 0xFF00) >> 8);
         check = check & 0xFF;
@@ -373,7 +371,7 @@ void initWaterPump(void)
     _delay_cycles(3);                                // wait 3 clocks
     PWM1_3_CTL_R = 0;                                // turn-off PWM1 generator 3
     PWM1_3_GENA_R = PWM_1_GENA_ACTCMPAD_ONE | PWM_1_GENA_ACTLOAD_ZERO;
-    PWM1_3_LOAD_R = 255;                             // set period to 40 MHz sys clock / 2 / 32 = 78.431 kHz
+    PWM1_3_LOAD_R = 255;                             // set period to 40 MHz sys clock / 2 / 255 = 78.431 kHz
     PWM1_3_CMPA_R = 0;                               // PWM off (0=always low, 1023=always high)
     PWM1_3_CTL_R = PWM_1_CTL_ENABLE;                 // turn-on PWM1 generator 3
     PWM1_ENABLE_R = PWM_ENABLE_PWM6EN;               // enable PWM output
