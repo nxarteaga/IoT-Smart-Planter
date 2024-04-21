@@ -1,6 +1,27 @@
 /*
- * Rolando Rosales (1001850424) IoT Smart Planter Peripheral Library
- * github.com/rolo-g
+ * Rolando Rosales 1001850424 - CSE 4352 "IoT Smart Planter" Peripheral Library
+ * 
+ * Hardware setup:
+ * BH1750 Ambient Light Sensor:
+ * - SCL -> PB2
+ * - SDA -> PB3
+ * - ADDR -> GND
+ * - 4.7k Pull-up resistors on SDA and SCL
+ * 
+ * DHT22 Temperature and Humidity Sensor:
+ * - out -> PD2
+ * 
+ * Capacitive Soil Moisture Sensor:
+ * - AOUT -> PE0
+ * 
+ * Water Pump Motor:
+ * - IN1 -> PF2
+ * - IN2 -> PF3
+ * - Motor +- on either MOTOR-A pins
+ * 
+ * HX711 Weight Sensor:
+ * - DT -> PE1
+ * - SCK -> PE2
 */
 
 // Libraries ------------------------------------------------------------------
@@ -10,17 +31,22 @@
 #include "tm4c123gh6pm.h"
 #include "i2c0.h"
 #include "gpio.h"
+#include "timer.h"
 #include "wait.h"
 #include "adc0.h"
 #include "plant.h"
+
+#ifdef PLANT_DEBUG
+#include "uart0.h"
 #include "led_builtin.h"
+#endif
 
 // Defines --------------------------------------------------------------------
 
 // Preprocessor directives
 #define DH_PRINT_ERRORS     // Print debug messages for DHT22 sensor
 
-// BH1750
+// BH1750 Ambient Light Sensor
 #define BH_ADDRESS_VCC  0x5C    // Address when ADDR connected to VCC
 #define BH_ADDRESS_GND  0x23    // Address when ADDR connected to GND
 #define BH_POWER_ON     0x01
@@ -31,20 +57,28 @@
 #define BH_ONE_TIME_H_RES_MODE_1    0x20 // 1lx res
 #define BH_ONE_TIME_H_RES_MODE_2    0x21 // 0.5lx res
 #define BH_ONE_TIME_H_RES_MODE      0x23 // 4lx res
-#define BH_H_MEASUREMENT_DELAY  120000  // 120ms delay for high res modes
-#define BH_L_MEASUREMENT_DELAY  16000   // 16ms delay for low res modes
+#define BH_H_MEASUREMENT_DELAY_US  120000  // 120ms delay for high res modes
+#define BH_L_MEASUREMENT_DELAY_US  16000   // 16ms delay for low res modes
 
-// DHT22
+// DHT22 Temperature and Humidity Sensor
 #define DH_OUT_PIN PORTD, 2     // Data output pin
+#define DH_WAIT_TIME_SECONDS 2      // Time in seconds to wait for sensor to be ready
 
 // Capacitive Soil Moisture Sensor
 #define SM_AOUT_PIN PORTE, 0    // Analog output pin
 
-// Water Pump
-#define IN1_PWM_PIN PORTF, 2
-#define IN2_GPO_PIN PORTF, 3
+// Water Pump Motor
+#define WP_PWM_PIN PORTF, 2     // PWM pin
+#define WP_GPO_PIN PORTF, 3     // Regular GPIO pin
+
+// HX711 Weight Sensor
+#define HX_DOUT_PIN PORTE, 1    // Data output pin
+#define HX_SCK_PIN PORTE, 2     // PD Clock pin
 
 // Variables ------------------------------------------------------------------
+
+// DHT22 Temperature and Humidity Sensor
+bool DHT22ready = true;     // Flag for sensor readiness
 
 // Capacitive Soil Moisture Sensor
 const float moistureMin = 1280.0; // Minimum value from the ADC (Water)
@@ -62,18 +96,9 @@ typedef struct _dht22Data
 
 // Functions ------------------------------------------------------------------
 
-// Plant
-
-// Initializes the plant peripherals
-void initPlant(void)
-{
-    initBH1750();
-    initDHT22();
-    initSoilMoisture();
-}
-
-// BH1750
-// TODO: Use timer to wait between readings, instead of waitMicrosecond
+// BH1750 Ambient Light Sensor
+// TODO: Use 120ms timer for BH1750
+// FIXME: Move BH1750 to I2C1 as it conflicts with ether
 
 // Initializes the BH1750 Ambient Light sensor
 void initBH1750(void)
@@ -87,7 +112,7 @@ void initBH1750(void)
     writeI2c0Data(BH_ADDRESS_GND, BH_CONTINUOUS_H_RES_MODE_1);
 
     // Waits 120ms between readings for high res mode
-    waitMicrosecond(BH_H_MEASUREMENT_DELAY);
+    waitMicrosecond(BH_H_MEASUREMENT_DELAY_US);
 }
 
 // Gets the lux value from the BH1750 sensor
@@ -103,14 +128,13 @@ uint16_t getBH1750Lux(void)
     uint16_t lux = ((data[0] << 8) | data[1]) / 1.2;
 
     // Waits 120ms between readings for high res mode
-    waitMicrosecond(BH_H_MEASUREMENT_DELAY);
+    waitMicrosecond(BH_H_MEASUREMENT_DELAY_US);
 
     return lux;
 }
 
-// DHT22
-// TODO: Use timer to indicate when sensor is ready
-// TODO: Further test sensor
+// DHT22 Temperature and Humidity Sensor
+// TODO: Further test DHT22
 
 // Initalizes the DHT22 Temperature and Humidity sensor
 void initDHT22(void)
@@ -122,9 +146,21 @@ void initDHT22(void)
     setPinValue(DH_OUT_PIN, 1);
 }
 
+// Callback function for the DHT22 sensor that sets the flag to true
+void callbackDHT22(void)
+{
+    DHT22ready = true;
+    KillTimer(callbackDHT22);
+}
+
 // Reads and stores the 40 bits of data from the DHT22 sensor
 bool readDHT22Data(dht22Data *data)
 {
+    // Blocking function that waits until sensor is ready
+    while (!DHT22ready)
+    {
+    }
+
     bool ok = false;
     volatile uint8_t mask = 0;
     volatile uint8_t count = 0;
@@ -204,26 +240,29 @@ bool readDHT22Data(dht22Data *data)
             counter_high_seg[mask] = counter_high;
             counter_high = 0;
         }
+
+        // Calculate and verify checksum
+        // Broken up to make it easier to read
+        // Checksum =
+        // ((h & 0xFF) + (h & 0xFF00 >> 8) + (t & 0xFF) + (t & 0xFF00 >> 8)) & 0xFF
+        uint8_t check = 0;
+        check = (data->hum & 0xFF) + ((data->hum & 0xFF00) >> 8);
+        check = check + (data->temp & 0xFF) + ((data->temp & 0xFF00) >> 8);
+        check = check & 0xFF;
+
+        // If incorrect, will return false
+        if (check != data->checksum)
+        {
+            ok = false;
+        }
     }
 
     // Outputs 1 as to wait for next data transmission
     selectPinPushPullOutput(DH_OUT_PIN);
     setPinValue(DH_OUT_PIN, 1);
 
-    // Calculate and verify checksum
-    // Broken up to make it easier to read
-    // Checksum =
-    // ((h & 0xFF) + (h & 0xFF00 >> 8) + (t & 0xFF) + (t & 0xFF00 >> 8)) & 0xFF
-    uint8_t check = 0;
-    check = (data->hum & 0xFF) + ((data->hum & 0xFF00) >> 8);
-    check = check + (data->temp & 0xFF) + ((data->temp & 0xFF00) >> 8);
-    check = check & 0xFF;
-
-    // If incorrect, will return false
-    if (check != data->checksum)
-    {
-        ok = false;
-    }
+    startOneshotTimer(callbackDHT22, DH_WAIT_TIME_SECONDS);
+    DHT22ready = false;
 
     return ok;
 }
@@ -240,14 +279,14 @@ float getDHT22Temp(void)
     // Return value
     float temp = 0.0;
 
+    // Returns temperature in Celcius, rounded to 1 decimal place
     if (readDHT22Data(&data))
     {
-        // Returns temperature in Celcius, rounded to 1 decimal place
         temp = (float)data.temp / 10;
     }
+    // Indicates an error
     else
     {
-        // Indicates an error
         temp = 999.9;
     }
 
@@ -266,14 +305,14 @@ float getDHT22Hum(void)
     // Return value
     float hum = 0.0;
 
+    // Returns humidity in percentage, rounded to 1 decimal place
     if (readDHT22Data(&data))
     {
-        // Returns humidity in percentage, rounded to 1 decimal place
         hum = (float)data.hum / 10;
     }
+    // Indicates an error
     else
     {
-        // Indicates an error
         hum = 999.9;
     }
 
@@ -283,7 +322,7 @@ float getDHT22Hum(void)
 // Capacitive Soil Moisture Sensor
 
 // Initializes the Capacitive Soil Moisture sensor
-void initSoilMoisture(void)
+void initSoilMoistureSensor(void)
 {
     enablePort(PORTE);
 
@@ -311,9 +350,10 @@ float getSoilMoisture(void)
     return moisture;
 }
 
-// Water Pump
+// Water Pump Motor
+// TODO: Make sure water pump actually pumps water correctly lol
 
-// Initializes the water pump
+// Initializes the water pump for PWM control
 void initWaterPump(void)
 {
     // Enable clocks
@@ -322,28 +362,88 @@ void initWaterPump(void)
     enablePort(PORTF);
 
     // Configure IN1 (PWM) and IN2 (Direction) outputs
-    selectPinPushPullOutput(IN1_PWM_PIN);
-    setPinAuxFunction(IN1_PWM_PIN, GPIO_PCTL_PF2_M1PWM6);
-    selectPinPushPullOutput(IN2_GPO_PIN);
+    selectPinPushPullOutput(WP_PWM_PIN);
+    setPinAuxFunction(WP_PWM_PIN, GPIO_PCTL_PF2_M1PWM6);
+    selectPinPushPullOutput(WP_GPO_PIN);
 
-    // Configure PWM module 1 to drive motor
+    // Configure PWM module 1 to drive water pump motor
     // PWM on M1PWM6 (PF2), M0PWM3a
     SYSCTL_SRPWM_R |= SYSCTL_SRPWM_R1;               // reset PWM1 module
     SYSCTL_SRPWM_R &= ~SYSCTL_SRPWM_R1;              // leave reset state
     _delay_cycles(3);                                // wait 3 clocks
     PWM1_3_CTL_R = 0;                                // turn-off PWM1 generator 3
     PWM1_3_GENA_R = PWM_1_GENA_ACTCMPAD_ONE | PWM_1_GENA_ACTLOAD_ZERO;
-    PWM1_3_LOAD_R = 1024;                            // set period to 40 MHz sys clock / 2 / 1024 = 19.53125 kHz
+    PWM1_3_LOAD_R = 255;                             // set period to 40 MHz sys clock / 2 / 32 = 78.431 kHz
     PWM1_3_CMPA_R = 0;                               // PWM off (0=always low, 1023=always high)
     PWM1_3_CTL_R = PWM_1_CTL_ENABLE;                 // turn-on PWM1 generator 3
     PWM1_ENABLE_R = PWM_ENABLE_PWM6EN;               // enable PWM output
 
     // Sets direction to always be the same
-    setPinValue(IN2_GPO_PIN, 1);
+    setPinValue(WP_GPO_PIN, 0);
 }
 
 // Sets the water pump PWM duty cycle
-void setWaterPumpPWM(uint32_t dutyCycle)
+void setWaterPumpPWM(uint8_t duty)
 {
-    PWM1_3_CMPA_R = dutyCycle;
+    PWM1_3_CMPA_R = duty;
 }
+
+// HX711 Weight Sensor
+// TODO: Finish writing HX711 functions
+
+// Initializes the HX711
+void initHX711(void)
+{
+    enablePort(PORTE);
+
+    selectPinPushPullOutput(HX_SCK_PIN);
+    selectPinDigitalInput(HX_DOUT_PIN);
+}
+
+// Reads and returns the data from the HX711
+uint32_t readHX711Data(void)
+{
+    uint16_t i = 0;
+    uint32_t data = 0;
+
+    // Reads 24 bits of data from the HX711
+    for (i = 0; i < 24; i++)
+    {
+        setPinValue(HX_SCK_PIN, 1);
+        _delay_cycles(10);
+        setPinValue(HX_SCK_PIN, 0);
+        
+        data <<= 1;
+        data |= getPinValue(HX_DOUT_PIN);
+
+        _delay_cycles(10);
+    }
+
+    // 25th clock pulse to set default gain and channel
+    setPinValue(HX_SCK_PIN, 1);
+    setPinValue(HX_SCK_PIN, 0);
+
+    return data;
+}
+
+// Calculates and returns the volume in milliliters from the HX711
+uint16_t getHX711Volume(void)
+{
+    uint32_t raw = readHX711Data();
+    uint16_t volume = raw / 1000;
+
+    return volume;
+}
+
+// Plant
+
+// Initializes the plant peripherals
+void initPlant(void)
+{
+    initBH1750();
+    initDHT22();
+    initSoilMoistureSensor();
+    initWaterPump();
+    // initHX711();
+}
+

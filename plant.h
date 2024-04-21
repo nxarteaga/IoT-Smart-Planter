@@ -9,9 +9,6 @@
 // Libraries ------------------------------------------------------------------
 
 #include <stdint.h>
-#include <stdbool.h>
-#include "i2c0.h"
-#include "wait.h"
 #include "plant.h"
 
 // Defines --------------------------------------------------------------------
@@ -23,16 +20,22 @@
 // Functions ------------------------------------------------------------------
 
 // BH1750
-void initBH1750(void);
 uint16_t getBH1750Lux(void);
 
 // DHT22
-void initDHT22(void);
 float getDHT22Temp(void);
 float getDHT22Hum(void);
 
 // Capacitive Soil Moisture Sensor
-void initSoilMoisture(void);
 float getSoilMoisture(void);
+
+// Water pump
+void setWaterPumpPWM(uint8_t duty);
+
+// HX711 Weight Sensor
+uint16_t getHX711Volume(void);
+
+// Plant
+void initPlant(void);
 
 #endif

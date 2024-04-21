@@ -461,36 +461,30 @@ int main(void)
     initUart0();
     setUart0BaudRate(115200, 40e6);
 
-    initSoilMoisture();
+    initTimer();
 
-    /*
-    // initBH1750();
-    initDHT22();
+    initPlant();
 
-    float temp = getDHT22Temp();
-
-    waitMicrosecond(2e6);
-
-    float hum = getDHT22Hum();
-
-    while(true);
-    */
-
+    setWaterPumpPWM(200);
 
     while(1)
     {
-        snprintf(strInput, sizeof(strInput), "Moist: %f\n", getSoilMoisture());
-        putsUart0(strInput);
-        waitMicrosecond(1e6);
-    }
-
-    /*
-    while (true)
-    {
+        // BH1750
         snprintf(strInput, sizeof(strInput), "Lux: %"PRIu16"\n", getBH1750Lux());
         putsUart0(strInput);
+
+        // DHT22
+        snprintf(strInput, sizeof(strInput), "Temperature: %f\n", getDHT22Temp());
+        putsUart0(strInput);
+        snprintf(strInput, sizeof(strInput), "Humidity: %f\n", getDHT22Hum());
+        putsUart0(strInput);
+
+        // Soil Moisture
+        snprintf(strInput, sizeof(strInput), "Moisture: %f\n", getSoilMoisture());
+        putsUart0(strInput);
+
+        waitMicrosecond(1000);
     }
-    */
 }
 
 /*
