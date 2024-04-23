@@ -371,19 +371,19 @@ void initWaterPump(void)
     _delay_cycles(3);                                // wait 3 clocks
     PWM1_3_CTL_R = 0;                                // turn-off PWM1 generator 3
     PWM1_3_GENA_R = PWM_1_GENA_ACTCMPAD_ONE | PWM_1_GENA_ACTLOAD_ZERO;
-    PWM1_3_LOAD_R = 255;                             // set period to 40 MHz sys clock / 2 / 255 = 78.431 kHz
+    PWM1_3_LOAD_R = 1023;                             // set period to 40 MHz sys clock / 2 / 255 = 78.431 kHz
     PWM1_3_CMPA_R = 0;                               // PWM off (0=always low, 1023=always high)
     PWM1_3_CTL_R = PWM_1_CTL_ENABLE;                 // turn-on PWM1 generator 3
     PWM1_ENABLE_R = PWM_ENABLE_PWM6EN;               // enable PWM output
 
     // Sets direction to always be the same
-    setPinValue(WP_GPO_PIN, 0);
+    setPinValue(WP_GPO_PIN, 1);
 }
 
 // Sets the water pump PWM duty cycle
-void setWaterPumpPWM(uint8_t duty)
+void setWaterPumpPWM(uint16_t duty)
 {
-    PWM1_3_CMPA_R = duty;
+    PWM1_3_CMPA_R = 1023 - duty;
 }
 
 // HX711 Weight Sensor
