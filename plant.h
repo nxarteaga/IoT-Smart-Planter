@@ -55,6 +55,7 @@ void setWaterPumpSpeed(uint16_t duty);
 
 // HX711 Weight Sensor
 uint16_t getHX711Volume(void);
+// uint32_t getHX711Raw(void);
 
 // Plant
 void initPlant(void);

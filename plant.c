@@ -71,6 +71,7 @@
 // HX711 Weight Sensor
 #define HX_DOUT_PIN PORTE, 1    // Data output pin
 #define HX_SCK_PIN PORTE, 2     // PD Clock pin
+#define HX_AVG_BUFF_SIZE 5
 
 // Variables ------------------------------------------------------------------
 
@@ -80,6 +81,10 @@ bool DHT22ready = true;     // Flag for sensor readiness
 // Capacitive Soil Moisture Sensor
 const float moistureMin = 1280.0; // Minimum value from the ADC (Water)
 const float moistureMax = 2970.0; // Maximum value from the ADC (Air)
+
+// HX711 Weight Sensor
+const uint32_t hx711Base = 330750;
+const uint16_t hx711Scaler = 52;
 
 // Structures -----------------------------------------------------------------
 
@@ -339,7 +344,7 @@ float getSoilMoisture(void)
 {
     // Stores raw value from the ADC
     float raw = (float)readAdc0Ss3();
-    // Return value with calcualted percentage
+    // Return value with calculated percentage
     float moisture = 0.0;
 
     // Calculates percentage: (1 - (raw - min) / (max - min)) * 100
@@ -427,10 +432,18 @@ uint32_t readHX711Data(void)
 // Calculates and returns the volume in milliliters from the HX711
 uint16_t getHX711Volume(void)
 {
+    // Gets data from HX711 and calculates the current volume
     uint32_t raw = readHX711Data();
-    uint16_t volume = raw / 1000;
+    uint16_t volume = (uint16_t)(raw - hx711Base);
+    volume = volume / hx711Scaler;
 
     return volume;
+}
+
+// Returns raw value from the HX711
+uint32_t getHX711Raw(void)
+{
+    return (readHX711Data() - hx711Base);
 }
 
 // Plant
@@ -438,10 +451,10 @@ uint16_t getHX711Volume(void)
 // Initializes the plant peripherals
 void initPlant(void)
 {
-    initBH1750();
-    initDHT22();
-    initSoilMoistureSensor();
-    initWaterPump();
-    // initHX711();
+    // initBH1750();
+    // initDHT22();
+    // initSoilMoistureSensor();
+    // initWaterPump();
+    initHX711();
 }
 

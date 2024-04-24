@@ -454,10 +454,10 @@ void processShell()
 
 int main(void)
 {
-    // Init controller
+    uint8_t i = 0;
+
     initHw();
 
-    // Setup UART0
     initUart0();
     setUart0BaudRate(115200, 40e6);
 
@@ -465,25 +465,41 @@ int main(void)
 
     initPlant();
 
-    setWaterPumpPWM(200);
-
     while(1)
     {
+        /*
         // BH1750
         snprintf(strInput, sizeof(strInput), "Lux: %"PRIu16"\n", getBH1750Lux());
         putsUart0(strInput);
+        */
 
+        /*
         // DHT22
         snprintf(strInput, sizeof(strInput), "Temperature: %f\n", getDHT22Temp());
         putsUart0(strInput);
         snprintf(strInput, sizeof(strInput), "Humidity: %f\n", getDHT22Hum());
         putsUart0(strInput);
+        */
 
+        /*
         // Soil Moisture
         snprintf(strInput, sizeof(strInput), "Moisture: %f\n", getSoilMoisture());
         putsUart0(strInput);
+        */
 
-        waitMicrosecond(1000);
+        // HX711
+        snprintf(strInput, sizeof(strInput), "Volume: %"PRIu32" mL\n", getHX711Volume());
+        putsUart0(strInput);
+
+        /*
+        // Water Pump
+        for (i = 0; i < 5; i++)
+        {
+            setWaterPumpSpeed(254 * i);
+        }
+        */
+
+        waitMicrosecond(2000000);
     }
 }
 
