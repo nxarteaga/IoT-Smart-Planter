@@ -501,14 +501,14 @@ int main(void)
 //    address[1] = 254;
 //    address[2] = 90;
 //    address[3] = 46;
-    address[0] = 169;
-    address[1] = 254;
-    address[2] = 135;
-    address[3] = 145;
-//    address[0] = 192;
-//      address[1] = 168;
-//      address[2] = 2;
-//      address[3] = 10;
+//    address[0] = 169;
+//    address[1] = 254;
+//    address[2] = 135;
+//    address[3] = 145;
+    address[0] = 192;
+      address[1] = 168;
+      address[2] = 2;
+      address[3] = 10;
     setIpAddress(address);
     while (true)
     {

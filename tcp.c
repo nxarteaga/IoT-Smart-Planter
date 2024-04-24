@@ -197,7 +197,7 @@ void sendTcpPendingMessages(etherHeader *ether)
   // uint8_t i = 0;
 //
   //// case TCP_CLOSED;
-   uint8_t serverIp[IP_ADD_LENGTH]={169,254,135,137};
+   uint8_t serverIp[IP_ADD_LENGTH]={192,168,2,1};
 //  uint8_t serverIp[IP_ADD_LENGTH]={192,168,2,1};
    //uint8_t serverIp[IP_ADD_LENGTH]={10,37,129,2};
    //uint8_t serverIp[IP_ADD_LENGTH]={127,0,0,1};
@@ -273,9 +273,8 @@ void sendTcpPendingMessages(etherHeader *ether)
                soc.acknowledgementNumber = finAcknowledgementValue;
                soc.sequenceNumber = finSequenceValue;
 
-               sendTcpMessage(ether, &soc, ACK, data, dataSize);
+               sendTcpMessage(ether, &soc, FIN_ACK, data, dataSize);
                setTcpState(0, TCP_LAST_ACK);
-
            }
            else if(getTcpState(0) == TCP_LAST_ACK)  //Passive Close
            {
@@ -284,7 +283,7 @@ void sendTcpPendingMessages(etherHeader *ether)
                soc.acknowledgementNumber = finAcknowledgementValue;
                soc.sequenceNumber = finSequenceValue;
 
-               sendTcpMessage(ether, &soc, FIN_ACK, data, dataSize);
+               //sendTcpMessage(ether, &soc, FIN_ACK, data, dataSize);
 //               remainClosed = true;
 
            }else if(getTcpState(0) == TCP_TIME_WAIT)
