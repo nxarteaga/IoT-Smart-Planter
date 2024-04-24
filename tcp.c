@@ -23,6 +23,7 @@
 #include "tcp.h"
 #include "timer.h"
 #include "led_builtin.h" // just for debugging, remove when finished
+#include "wait.h"
 
 #define MAX_TCP_PORTS 4
 
@@ -37,6 +38,7 @@ uint8_t tcpState[MAX_TCP_PORTS];
 bool synNeeded = false;
 bool ackNeeded = false;
 bool arpNeeded = true;
+bool finackNeeded = false;
 
 //-----------------------------------------------------------------------------
 //  Structures
@@ -105,6 +107,13 @@ bool isTcpAck(etherHeader *ether)
     return ((tcp->offsetFields & htons(ACK)) == htons(ACK)) ? true : false;
 }
 
+// TODO: isTcpAck is now fixed, but may need further testing
+bool isTcpFin(etherHeader *ether)
+{
+    tcpHeader *tcp = getTcpHeaderPtr(ether);
+    return ((tcp->offsetFields & htons(FIN)) == htons(FIN)) ? true : false;
+}
+
 // TODO: finish sendTcpPendingMessages state machine
 void sendTcpPendingMessages(etherHeader *ether, socket *s)
 {
@@ -129,9 +138,14 @@ void sendTcpPendingMessages(etherHeader *ether, socket *s)
     if (ackNeeded)
     {
         sendTcpMessage(ether, s, ACK, 0, 0);
+        if ()
         setTcpState(0, TCP_ESTABLISHED);
         ackNeeded = false;
         enableAllLEDs();
+    }
+    if (finackNeeded)
+    {
+        sendTcpMessage(ether, s, FIN | ACK, 0, 0);
     }
 }
 
@@ -152,6 +166,30 @@ void processTcpResponse(etherHeader *ether, socket *s)
             }
             break;
         case TCP_ESTABLISHED:
+            /*
+            waitMicrosecond(1e6);
+            finackNeeded = true;
+            */
+            if (isTcpFin(ether))
+            {
+                ackNeeded = true;
+                setTcpState(0, TCP_CLOSE_WAIT);
+            }
+            break;
+        case TCP_FIN_WAIT_1:
+            if (isTcpAck(ether))
+            {
+                setTcpState(0, TCP_FIN_WAIT_2);
+            }
+            break;
+        case TCP_FIN_WAIT_2:
+            if (isTcpFin(ether))
+            {
+                ackNeeded = true;
+            break;
+        case TCP_TIME_WAIT:
+            waitMicrosecond(1e6);
+            setTcpState(0, TCP_CLOSED);
             break;
     }
 }

@@ -554,7 +554,7 @@ int main(void)
 
     // Ports
     s.remotePort = 1883; // MQTT Port
-    s.localPort = 50002; // Gets random port, start at 50000 for testing
+    s.localPort = 50006; // Gets random port, start at 50000 for testing
 
     // SEQ/ACK Nums
     s.sequenceNumber = htonl(1); // Starts at 1
@@ -657,6 +657,7 @@ int main(void)
                     if (isTcp(data))
                     {
                         processTcpResponse(data, &s);
+                        // processTcpResponse(data, &s);
                         if (isTcpPortOpen(data))
                         {
                         }
