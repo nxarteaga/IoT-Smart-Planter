@@ -51,7 +51,7 @@ float getDHT22Hum(void);
 float getSoilMoisture(void);
 
 // Water pump
-void setWaterPumpPWM(uint16_t duty);
+void setWaterPumpSpeed(uint16_t duty);
 
 // HX711 Weight Sensor
 uint16_t getHX711Volume(void);

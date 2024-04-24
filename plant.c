@@ -381,7 +381,7 @@ void initWaterPump(void)
 }
 
 // Sets the water pump PWM duty cycle
-void setWaterPumpPWM(uint16_t duty)
+void setWaterPumpSpeed(uint16_t duty)
 {
     PWM1_3_CMPA_R = 1023 - duty;
 }
