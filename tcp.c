@@ -24,6 +24,7 @@
 #include "tcp.h"
 #include "dhcp.h" //Make a function in dhcp.h/c to return the hardware address of the server. This will be used in sendTcpMessage. serverHW_Address is part of Ethernet frame
 #include "timer.h"
+#include "mqtt.h"
 
 // ------------------------------------------------------------------------------
 //  Globals
@@ -32,6 +33,7 @@
 #define MAX_TCP_PORTS 4
 #define TCP 6
 #define FIN_ACK 0x0011
+#define PSH_ACK 0x0018
 #define idk 0010000000000000
 //// TCP states
 //#define TCP_CLOSED 0
@@ -48,6 +50,7 @@
 bool SYN_ACK_RECEIVED = false;
 bool FIN_ACK_RECEIVED_GoToCloseWait = false;
 bool remainClosed = false;
+
 uint32_t finAcknowledgementValue =0;
 uint32_t finSequenceValue = 0;
 uint16_t tcpPorts[MAX_TCP_PORTS];
@@ -253,6 +256,15 @@ void sendTcpPendingMessages(etherHeader *ether)
            {
                //putsUart0("\nEstablish state\n");
                //send subscribed topics in here?
+               //MQTT messages
+               dataSize = 39;
+               if(getMqttState() == 0)
+               {
+                   putsUart0("\nEstablish state\n");
+                   sendMqttMessage(ether,&soc, PSH_ACK, data, dataSize);
+                   setTcpState(0,1);
+               }
+
            }else if(getTcpState(0) == TCP_FIN_WAIT_1)
            {
               // datasize = 0;
@@ -388,6 +400,8 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
     setFlags(tcp->offsetFields,flags);
     //tcpLength = sizeof(tcpHeader)+dataSize;
     tcpLength = sizeof(tcpHeader)+dataSize; //TCP syn has no data
+
+    //clears the first 4 upper bits
     tcp->offsetFields &= ~(0xF000);
     tcpHeaderLength = ((sizeof(tcpHeader)/4) << OFS_SHIFT);
     //tcpHeaderLength = (sizeof(tcpHeader)/4);

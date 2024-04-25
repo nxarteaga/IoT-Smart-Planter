@@ -24,7 +24,7 @@
 #include "ip.h"
 #include "socket.h"
 
-typedef struct _tcpHeader // 20 or more bytes
+typedef struct _tcpHeader
 {
   uint16_t sourcePort;
   uint16_t destPort;
@@ -78,9 +78,11 @@ typedef struct Tcb
 }TCB;
 
 
+
+
 void setTcpState(uint8_t instance, uint8_t state);
 uint8_t getTcpState(uint8_t instance);
-
+uint8_t *getTCPHeaderPtr(etherHeader *ether);
 bool isTcp(etherHeader *ether);
 bool isTcpSyn(etherHeader *ether);
 bool isTcpAck(etherHeader *ether);
