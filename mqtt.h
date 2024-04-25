@@ -27,12 +27,11 @@
 // Subroutines
 //-----------------------------------------------------------------------------
 
-//void connectMqtt(etherHeader *ether, uint8_t *data, uint16_t size);
-void connectMqtt();
-void disconnectMqtt();
-void publishMqtt(char strTopic[], char strData[]);
-void subscribeMqtt(char strTopic[]);
-void unsubscribeMqtt(char strTopic[]);
+void connectMqtt(etherHeader *ether, socket *s);
+void disconnectMqtt(etherHeader *ether, socket *s);
+void publishMqtt(etherHeader *ether, socket *s, char strTopic[], char strData[]);
+void subscribeMqtt(etherHeader *ether, socket *s, char strTopic[]);
+void unsubscribeMqtt(etherHeader *ether, socket *s, char strTopic[]);
 
 #endif
 
