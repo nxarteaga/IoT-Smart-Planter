@@ -79,7 +79,7 @@ void connectMqtt(etherHeader *ether, socket *s)
 
     uint8_t dataSize = sizeof(mqttHeader) + data->msgLen;
 
-    // TODO: Update ack number
+    // FIXME: Update ack number
     sendTcpMessage(ether, s, PSH | ACK, (uint8_t *)data, dataSize);
 }
 
