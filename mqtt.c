@@ -25,7 +25,7 @@
 #include "eth0.h"
 #include "timer.h"
 
-#define MAX_BUFF_SIZE 32
+#define MAX_BUFF_SIZE 64
 
 // ------------------------------------------------------------------------------
 //  Globals
@@ -47,7 +47,7 @@ void connectMqtt(etherHeader *ether, socket *s)
 
     mqtt->headerFlags = 0x10;   // Connect Flag
 
-    // MQTT Payload
+    // MQTT Connect Payload
     mqttConnect *payload = (mqttConnect*) mqtt->lengthPayload;
 
     payload->protocolNameLength = htons(0x0004);    // Length of MQTT
@@ -64,20 +64,77 @@ void connectMqtt(etherHeader *ether, socket *s)
     mqtt->msgLen = sizeof(mqttConnect);        
     uint8_t dataSize = sizeof(mqttHeader) + mqtt->msgLen;
 
-    // FIXME: Update ack number
-
     // Send the MQTT Connect message
     sendTcpMessage(ether, s, PSH | ACK, (uint8_t *)mqtt, dataSize);
 }
 
 void disconnectMqtt(etherHeader *ether, socket *s)
 {
+    // MQTT "Header"
+    uint8_t buffer[MAX_BUFF_SIZE];
+    mqttHeader* mqtt = (mqttHeader*) buffer;
 
+    mqtt->headerFlags = 0x10;   // Connect Flag
+    mqtt->lengthPayload[0] = 0x0;
+
+    // adjust lengths
+    mqtt->msgLen = 0x0;    
+    uint8_t dataSize = sizeof(mqttHeader) + mqtt->msgLen;
+
+    sendTcpMessage(ether, s, PSH | ACK, (uint8_t *)mqtt, dataSize);
 }
 
 void publishMqtt(etherHeader *ether, socket *s, char strTopic[], char strData[])
 {
+    // MQTT "Header"
+    uint8_t buffer[MAX_BUFF_SIZE];
+    mqttHeader* mqtt = (mqttHeader*) buffer;
+    uint16_t payloadSize = 0;
+    char *strPtr;
+    char *payloadPtr;
 
+    mqtt->headerFlags = 0x30;   // Connect Flag
+
+    // MQTT Publish Payload
+    mqttPublish *payload = (mqttPublish*) mqtt->lengthPayload;
+
+    strPtr = strTopic;  // Point to the start of topic to be copied
+    payloadPtr = payload->topic; // Point to the start of topic in payload
+
+    // Topic name loop
+    while (*strPtr)
+    {
+        payloadSize++;          // Increment the payload size
+        *payloadPtr = *strPtr;  // Copy the topic name
+        
+        // Move pointer
+        payloadPtr++;
+        strPtr++;
+    }
+
+    payload->topicLength = htons(payloadSize); // Set the topic length
+
+    strPtr = strData;  // Point to the start of message to be copied
+    payloadPtr++; // Point to the start of message in payload
+
+    // FIXME: Adjust length for message (cuts off last character)
+    // Message loop
+    while (*strPtr)
+    {
+        payloadSize++;          // Increment the payload size
+        *payloadPtr = *strPtr;  // Copy the message
+        
+        // Move pointer
+        payloadPtr++;
+        strPtr++;
+    }
+
+    // adjust lengths
+    mqtt->msgLen = sizeof(mqttPublish) + payloadSize;
+    uint8_t dataSize = sizeof(mqttHeader) + mqtt->msgLen;
+
+    // Send the MQTT Connect message
+    sendTcpMessage(ether, s, PSH | ACK, (uint8_t *)mqtt, dataSize);
 }
 
 void subscribeMqtt(etherHeader *ether, socket *s, char strTopic[])

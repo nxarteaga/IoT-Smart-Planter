@@ -23,6 +23,33 @@
 #include <stdbool.h>
 #include "tcp.h"
 
+// TCP Structures
+
+typedef struct _mqttHeader
+{
+    uint8_t headerFlags;
+    uint8_t msgLen;
+    uint8_t lengthPayload[0];
+} mqttHeader;
+
+typedef struct _mqttConnect
+{
+    uint16_t protocolNameLength;
+    char protocolName[4];
+    uint8_t version;
+    uint8_t connectFlags;
+    uint16_t keepAlive;
+    uint16_t clientIdLength;
+    uint8_t clientId[0];
+} mqttConnect;
+
+typedef struct _mqttPublish
+{
+    uint16_t topicLength;
+    char topic[0];
+    char message[0];
+} mqttPublish;
+
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------

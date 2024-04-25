@@ -315,30 +315,39 @@ void processShell()
                 token = strtok(NULL, " ");
                 if (strcmp(token, "connect") == 0)
                 {
-                    connectMqtt();
+                    // connectMqtt();
                 }
                 if (strcmp(token, "disconnect") == 0)
                 {
-                    disconnectMqtt();
+                    // disconnectMqtt();
                 }
                 if (strcmp(token, "publish") == 0)
                 {
                     topic = strtok(NULL, " ");
                     data = strtok(NULL, " ");
                     if (topic != NULL && data != NULL)
-                        publishMqtt(topic, data);
+                    {
+                        // publishMqtt(topic, data);
+                        uint8_t k = 0;
+                    }
                 }
                 if (strcmp(token, "subscribe") == 0)
                 {
                     topic = strtok(NULL, " ");
                     if (topic != NULL)
-                        subscribeMqtt(topic);
+                    {
+                        // subscribeMqtt(topic);
+                        uint8_t k = 0;
+                    }
                 }
                 if (strcmp(token, "unsubscribe") == 0)
                 {
                     topic = strtok(NULL, " ");
                     if (topic != NULL)
-                        unsubscribeMqtt(topic);
+                    {
+                        // unsubscribeMqtt(topic);
+                        uint8_t k = 0;
+                    }
                 }
             }
             if (strcmp(token, "ip") == 0)
@@ -454,7 +463,7 @@ void processShell()
 #define MAX_PACKET_SIZE 1518
 
 int main(void)
-{
+    {
     uint8_t* udpData;
     uint8_t buffer[MAX_PACKET_SIZE];
     etherHeader *data = (etherHeader*) buffer;
@@ -489,33 +498,6 @@ int main(void)
     waitMicrosecond(100000);
 
     disableDhcp();
-
-    /*
-    // Hardcoded socket variables for testing
-
-    // MAC Address
-    // Pi - b8:27:eb:19:cc:81
-    s.remoteHwAddress[0] = 0xb8;
-    s.remoteHwAddress[1] = 0x27;
-    s.remoteHwAddress[2] = 0xeb;
-    s.remoteHwAddress[3] = 0x19;
-    s.remoteHwAddress[4] = 0xcc;
-    s.remoteHwAddress[5] = 0x81;
-    // Laptop - xx:xx:xx:xx:xx:xx
-    s.remoteHwAddress[0] = 0x0;
-    s.remoteHwAddress[1] = 0x0;
-    s.remoteHwAddress[2] = 0x0;
-    s.remoteHwAddress[3] = 0x0;
-    s.remoteHwAddress[4] = 0x0;
-    s.remoteHwAddress[5] = 0x0;
-    // Lab - 3c:37:86:f8:a1:1b
-    s.remoteHwAddress[0] = 0x3c;
-    s.remoteHwAddress[1] = 0x37;
-    s.remoteHwAddress[2] = 0x86;
-    s.remoteHwAddress[3] = 0xf8;
-    s.remoteHwAddress[4] = 0xa1;
-    s.remoteHwAddress[5] = 0x1b;
-    */
 
     // TODO: Remove manual IP stuff once EEPROM is fixed
 
@@ -554,39 +536,17 @@ int main(void)
 
     // Ports
     s.remotePort = 1883; // MQTT Port
-    s.localPort = 50006; // Gets random port, start at 50000 for testing
+    s.localPort = 50010; // Gets random port, start at 50000 for testing
 
     // SEQ/ACK Nums
-    s.sequenceNumber = htonl(1); // Starts at 1
+    s.sequenceNumber = htonl(2); // Starts at 1
     s.acknowledgementNumber = htonl(0); // Will be set by the server
 
     // State
     s.state = TCP_CLOSED; // Closed on startup
 
-    /*
-    // hardcoding everything here
+    bool testMqtt = true;
 
-    getEtherPacket(data, MAX_PACKET_SIZE);
-
-    sendTcpMessage(data, &s, SYN, 0, 0);
-
-    while (1)
-    {
-        getEtherPacket(data, MAX_PACKET_SIZE);
-        processShell();
-        if (isArpRequest(data))
-        {
-            sendArpResponse(data);
-        }
-        if (isTcp(data))
-        {
-            sendTcpMessage(data, &s, ACK, 0, 0);
-            setPinValue(GREEN_LED, 1);
-            while(1);
-        }
-    }
-}
-*/
     // Main Loop
     // RTOS and interrupts would greatly improve this code,
     // but the goal here is simplicity
@@ -604,7 +564,17 @@ int main(void)
         // TCP pending messages
         sendTcpPendingMessages(data, &s);
 
-        // Packet processing
+        // TESTING MQTT CONNECTION - DELETE AFTER
+        if (getTcpState(0) == TCP_ESTABLISHED && testMqtt)
+        {
+            connectMqtt(data, &s);
+            waitMicrosecond(1e6);
+            // Publish topic "test", message "hello"
+            publishMqtt(data, &s, "test", "hello");
+            while(1);
+        }
+
+        // Packet processings
         if (isEtherDataAvailable())
         {
             if (isEtherOverflow())
