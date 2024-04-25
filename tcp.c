@@ -38,7 +38,7 @@ uint8_t tcpState[MAX_TCP_PORTS];
 bool synNeeded = false;
 bool ackNeeded = false;
 bool arpNeeded = true;
-bool finackNeeded = false;
+bool finNeeded = false;
 
 //-----------------------------------------------------------------------------
 //  Structures
@@ -65,6 +65,13 @@ tcpHeader* getTcpHeaderPtr(etherHeader *ether)
 {
     ipHeader *ip = (ipHeader*)ether->data;
     return (tcpHeader*)((uint8_t*)ip + (ip->size * 4));
+}
+
+void updateTcpSeqAck(etherHeader *ether, socket *s)
+{
+    tcpHeader *tcp = getTcpHeaderPtr(ether);
+    s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + 1;
+    s->sequenceNumber = ntohl(tcp->acknowledgementNumber);
 }
 
 // Determines whether packet is TCP packet
@@ -138,14 +145,12 @@ void sendTcpPendingMessages(etherHeader *ether, socket *s)
     if (ackNeeded)
     {
         sendTcpMessage(ether, s, ACK, 0, 0);
-        if ()
-        setTcpState(0, TCP_ESTABLISHED);
         ackNeeded = false;
-        enableAllLEDs();
     }
-    if (finackNeeded)
+    if (finNeeded)
     {
         sendTcpMessage(ether, s, FIN | ACK, 0, 0);
+        finNeeded = false;
     }
 }
 
@@ -159,37 +164,68 @@ void processTcpResponse(etherHeader *ether, socket *s)
         case TCP_SYN_SENT:
             if (isTcpAck(ether) && isTcpSyn(ether))
             {
-                tcpHeader *tcp = getTcpHeaderPtr(ether);
-                s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + 1;
-                s->sequenceNumber = s->sequenceNumber + 1;
+                updateTcpSeqAck(ether, s);
+
+                setTcpState(0, TCP_ESTABLISHED);
+                enableAllLEDs();
+                
                 ackNeeded = true;
             }
             break;
         case TCP_ESTABLISHED:
-            /*
-            waitMicrosecond(1e6);
-            finackNeeded = true;
-            */
             if (isTcpFin(ether))
             {
+                updateTcpSeqAck(ether, s);
+
                 ackNeeded = true;
                 setTcpState(0, TCP_CLOSE_WAIT);
             }
+
+            // Not waiting
+            if (getTcpState(0) != TCP_CLOSE_WAIT)
+            {
+                break;
+            }
+        case TCP_CLOSE_WAIT:
+            updateTcpSeqAck(ether, s);
+
+            finNeeded = true;
+            setTcpState(0, TCP_LAST_ACK);
             break;
         case TCP_FIN_WAIT_1:
             if (isTcpAck(ether))
             {
                 setTcpState(0, TCP_FIN_WAIT_2);
             }
+            if (isTcpFin(ether))
+            {
+                ackNeeded = true;
+                setTcpState(0, TCP_CLOSING);
+            }
             break;
         case TCP_FIN_WAIT_2:
             if (isTcpFin(ether))
             {
                 ackNeeded = true;
+                setTcpState(0, TCP_TIME_WAIT);
+                // Start time-wait timer
+            }
+            break;
+        case TCP_CLOSING:
+            if (isTcpAck(ether))
+            {
+                setTcpState(0, TCP_TIME_WAIT);
+                // Start time-wait timer
+            }
             break;
         case TCP_TIME_WAIT:
-            waitMicrosecond(1e6);
-            setTcpState(0, TCP_CLOSED);
+            // Closed by timer
+            break;
+        case TCP_LAST_ACK:
+            if (isTcpAck(ether))
+            {
+                setTcpState(0, TCP_CLOSED);
+            }
             break;
     }
 }
@@ -208,7 +244,7 @@ void processTcpArpResponse(etherHeader *ether, socket *s)
             s->remoteHwAddress[i] = arp->sourceAddress[i];
         }
         
-        synNeeded = true;        
+        synNeeded = true;  
     }
 }
 
@@ -231,7 +267,6 @@ void sendTcpResponse(etherHeader *ether, socket* s, uint16_t flags)
 // Send TCP message
 void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[], uint16_t dataSize)
 {
-    uint16_t tcpHeaderLength = 0;
     uint8_t localHwAddress[6];
     uint8_t localIpAddress[4];
     uint8_t i = 0;
