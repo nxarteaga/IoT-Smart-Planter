@@ -40,23 +40,8 @@
 
 // Functions ------------------------------------------------------------------
 
-// BH1750
-uint16_t getBH1750Lux(void);
-
-// DHT22
-uint8_t getDHT22Temp(void);
-uint8_t getDHT22Hum(void);
-void getDHT22TempAndHum(uint8_t *temp, uint8_t *hum);
-
-// Capacitive Soil Moisture Sensor
-uint16_t getSoilMoisture(void);
-uint32_t getSoilMoistureRaw(void);
-
 // Water pump
 void setWaterPumpSpeed(uint16_t duty);
-
-// HX711 Weight Sensor
-uint16_t getHX711Volume(void);
 
 // Plant
 void initPlant(void);
