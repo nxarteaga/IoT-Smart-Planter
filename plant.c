@@ -66,15 +66,16 @@
 
 // Capacitive Soil Moisture Sensor
 #define SM_AOUT_PIN PORTE, 0    // Analog output pin
+#define SM_AVG_BUFF_SIZE 5      // Circular buffer size
 
 // Water Pump Motor
 #define WP_PWM_PIN PORTF, 2     // PWM pin
 #define WP_GPO_PIN PORTF, 3     // Regular GPIO pin
 
+
 // HX711 Weight Sensor
 #define HX_DOUT_PIN PORTE, 1    // Data output pin
 #define HX_SCK_PIN PORTE, 2     // PD Clock pin
-#define HX_AVG_BUFF_SIZE 5
 
 // Plant
 #define PLANT_SAMPLE_TIME_S 1   // Sample time in seconds
@@ -89,8 +90,8 @@ const uint16_t moistureMin = 1550;  // Minimum value from the ADC (Water)
 const uint16_t moistureMax = 2750;  // Maximum value from the ADC (Air)
 
 // HX711 Weight Sensor
-const uint32_t hx711Base = 327000;  // Minimum value from HX711
-const uint16_t hx711Scaler = 457;   // Raw ADC to volume scale value
+const uint32_t hx711Base = 327200;  // Minimum value from HX711
+const uint16_t hx711Scaler = 428;   // Raw ADC to volume scale (div) value
 
 // Plant
 bool samplePlant = true;    // Flag indicating plant can be sampled
@@ -355,6 +356,12 @@ void initSoilMoistureSensor(void)
 // Gets the soil moisture percentage from the Capacitive Soil Moisture sensor
 uint16_t getSoilMoisture(void)
 {
+    // Circular buffer variables
+    static uint16_t buff[SM_AVG_BUFF_SIZE] = {0, 0, 0, 0, 0};
+    static uint32_t sum = 0;
+    static uint8_t i = 0;
+    static uint16_t moisture_avg = 0;
+
     // Stores raw value from the ADC
     uint16_t raw = readAdc0Ss3();
     // Return value with calculated percentage
@@ -362,8 +369,15 @@ uint16_t getSoilMoisture(void)
 
     // Calculates percentage: (1 - (raw - min) / (max - min)) * 100
     moisture = ((moistureMax - raw) * 100) / (moistureMax - moistureMin);
+
+    // Circular buffer for averaging
+    sum -= buff[i];
+    sum += moisture;
+    buff[i] = moisture;
+    i = (i + 1) % SM_AVG_BUFF_SIZE;
+    moisture_avg = sum / SM_AVG_BUFF_SIZE;
     
-    return moisture;
+    return moisture_avg;
 }
 
 // Returns raw value from the Capacitive Soil Moisture sensor
@@ -452,8 +466,8 @@ uint16_t getHX711Volume(void)
 {
     // Gets data from HX711 and calculates the current volume
     uint32_t raw = readHX711Data();
-    uint16_t volume = (uint16_t)(raw - hx711Base);
-    volume = volume / hx711Scaler;
+    uint16_t volume = ((raw - hx711Base) / hx711Scaler);
+    // volume = volume / hx711Scaler;
 
     return volume;
 }
