@@ -73,7 +73,7 @@
 #define HX_AVG_BUFF_SIZE 5
 
 // Plant
-#define PLANT_SAMPLE_TIME_S 1
+#define PLANT_SAMPLE_TIME_S 1   // Sample time in seconds
 
 // Variables ------------------------------------------------------------------
 
@@ -81,20 +81,20 @@
 bool DHT22ready = true;     // Flag for sensor readiness
 
 // Capacitive Soil Moisture Sensor
-const uint16_t moistureMin = 1550; // Minimum value from the ADC (Water)
-const uint16_t moistureMax = 2750; // Maximum value from the ADC (Air)
+const uint16_t moistureMin = 1550;  // Minimum value from the ADC (Water)
+const uint16_t moistureMax = 2750;  // Maximum value from the ADC (Air)
 
 // HX711 Weight Sensor
-const uint32_t hx711Base = 327000;
-const uint16_t hx711Scaler = 457;
+const uint32_t hx711Base = 327000;  // Minimum value from HX711
+const uint16_t hx711Scaler = 457;   // Raw ADC to volume scale value
 
 // Plant
-bool samplePlant = true;
+bool samplePlant = true;    // Flag indicating plant can be sampled
 
 // Structures -----------------------------------------------------------------
 
 // DHT22
-typedef struct _dht22Data
+typedef struct _dht22Data   // Bit fields as is in datasheet
 {
   uint16_t hum;
   uint16_t temp;
