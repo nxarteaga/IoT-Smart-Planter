@@ -105,7 +105,6 @@ typedef struct _dht22Data
 
 // BH1750 Ambient Light Sensor
 // TODO : Add i2c error checking
-// FIXME : Move BH1750 to I2C1 as it conflicts with eth0
 
 // Initializes the BH1750 Ambient Light sensor
 void initBH1750(void)
@@ -134,9 +133,6 @@ uint16_t getBH1750Lux(void)
     // Calculates lux value from sensor data
     uint16_t lux = ((data[0] << 8) | data[1]) / 1.2;
 
-    // Waits 120ms between readings for high res mode
-    // waitMicrosecond(BH_H_MEASUREMENT_DELAY_US);
-
     return lux;
 }
 
@@ -164,7 +160,7 @@ bool readDHT22Data(dht22Data *data)
 {
     bool ok = false;
 
-    // Blocking function that waits until sensor is ready
+    // Checks to see if sensor is ready (2 seconds have passed)
     if (DHT22ready)
     {
         volatile uint8_t mask = 0;
