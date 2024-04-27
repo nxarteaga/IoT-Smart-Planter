@@ -56,6 +56,7 @@
 #include "tcp.h"
 #include "dhcp.h"
 #include "mqtt.h"
+#include "plant.h"
 
 // Pins
 #define RED_LED PORTF,1
@@ -482,6 +483,9 @@ int main(void)
     // Init sockets
     initSockets();
 
+    // Init plant
+    initPlant(); /**************** Comment this out, otherwise i2c errors */
+
     // Init ethernet interface (eth0)
     putsUart0("\nStarting eth0\n");
     initEther(ETHER_UNICAST | ETHER_BROADCAST | ETHER_HALFDUPLEX);
@@ -547,11 +551,18 @@ int main(void)
 
     bool testMqtt = true;
 
+    uint16_t lux = 0;
+    uint8_t temp = 0, hum = 0;
+    uint16_t moist = 0, volume = 0;
+
     // Main Loop
     // RTOS and interrupts would greatly improve this code,
     // but the goal here is simplicity
     while (true)
     {
+        // Get plant data every second
+        getPlantData(&lux, &temp, &hum, &moist, &volume);
+
         // Put terminal processing here
         processShell();
 
