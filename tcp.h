@@ -62,7 +62,6 @@ typedef struct _tcpHeader // 20 or more bytes
 #define NS  0x0100
 #define OFS_SHIFT 12
 
-#define setFlags(x,y) (x |= (y))
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------
@@ -76,7 +75,6 @@ typedef struct Tcb
 
 }TCB;
 
-
 void setTcpState(uint8_t instance, uint8_t state);
 uint8_t getTcpState(uint8_t instance);
 
@@ -84,9 +82,10 @@ bool isTcp(etherHeader *ether);
 bool isTcpSyn(etherHeader *ether);
 bool isTcpAck(etherHeader *ether);
 
-void sendTcpPendingMessages(etherHeader *ether);
+void sendTcpPendingMessages(etherHeader *ether, socket *s);
 void processDhcpResponse(etherHeader *ether);
-void processTcpArpResponse(etherHeader *ether);
+void processTcpResponse(etherHeader *ether, socket *s);
+void processTcpArpResponse(etherHeader *ether, socket *s);
 
 void setTcpPortList(uint16_t ports[], uint8_t count);
 bool isTcpPortOpen(etherHeader *ether);

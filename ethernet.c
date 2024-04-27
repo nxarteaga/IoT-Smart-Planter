@@ -63,8 +63,8 @@
 #define GREEN_LED PORTF,3
 #define PUSH_BUTTON PORTF,4
 
-// EEPROM Map  Number corresponds to address of EEPROM
-#define EEPROM_DHCP        1       // Are we DHCP enable or not
+// EEPROM Map
+#define EEPROM_DHCP        1
 #define EEPROM_IP          2
 #define EEPROM_SUBNET_MASK 3
 #define EEPROM_GATEWAY     4
@@ -315,30 +315,39 @@ void processShell()
                 token = strtok(NULL, " ");
                 if (strcmp(token, "connect") == 0)
                 {
-                    connectMqtt();
+                    // connectMqtt();
                 }
                 if (strcmp(token, "disconnect") == 0)
                 {
-                    disconnectMqtt();
+                    // disconnectMqtt();
                 }
                 if (strcmp(token, "publish") == 0)
                 {
                     topic = strtok(NULL, " ");
                     data = strtok(NULL, " ");
                     if (topic != NULL && data != NULL)
-                        publishMqtt(topic, data);
+                    {
+                        // publishMqtt(topic, data);
+                        uint8_t k = 0;
+                    }
                 }
                 if (strcmp(token, "subscribe") == 0)
                 {
                     topic = strtok(NULL, " ");
                     if (topic != NULL)
-                        subscribeMqtt(topic);
+                    {
+                        // subscribeMqtt(topic);
+                        uint8_t k = 0;
+                    }
                 }
                 if (strcmp(token, "unsubscribe") == 0)
                 {
                     topic = strtok(NULL, " ");
                     if (topic != NULL)
-                        unsubscribeMqtt(topic);
+                    {
+                        // unsubscribeMqtt(topic);
+                        uint8_t k = 0;
+                    }
                 }
             }
             if (strcmp(token, "ip") == 0)
@@ -454,9 +463,8 @@ void processShell()
 #define MAX_PACKET_SIZE 1518
 
 int main(void)
-{
-//    char str[40];
-//    uint8_t* udpData;
+    {
+    uint8_t* udpData;
     uint8_t buffer[MAX_PACKET_SIZE];
     etherHeader *data = (etherHeader*) buffer;
     socket s;
@@ -472,14 +480,15 @@ int main(void)
     initTimer();
 
     // Init sockets
-    //initSockets();
+    initSockets();
 
     // Init ethernet interface (eth0)
     putsUart0("\nStarting eth0\n");
     initEther(ETHER_UNICAST | ETHER_BROADCAST | ETHER_HALFDUPLEX);
-    setEtherMacAddress(2, 3, 4, 5, 6, 102);
+    setEtherMacAddress(2, 3, 4, 5, 6, 0x79);
 
     // Init EEPROM
+    // FIXME: EEPROM is seemingly not storing values between resets?
     initEeprom();
     readConfiguration();
 
@@ -488,15 +497,59 @@ int main(void)
     setPinValue(GREEN_LED, 0);
     waitMicrosecond(100000);
 
+    disableDhcp();
+
+    // TODO: Remove manual IP stuff once EEPROM is fixed
+
+    uint8_t tempLocalIpAddress[4];
+    uint8_t tempSn[4];
+    uint8_t tempGw[4];
+
+    tempLocalIpAddress[0] = 192;
+    tempLocalIpAddress[1] = 168;
+    tempLocalIpAddress[2] = 1;
+    tempLocalIpAddress[3] = 121;
+
+    tempSn[0] = 255;
+    tempSn[1] = 255;
+    tempSn[2] = 255;
+    tempSn[3] = 0;
+
+    tempGw[0] = 192;
+    tempGw[1] = 168;
+    tempGw[2] = 1;
+    tempGw[3] = 163;
+
+    setIpAddress(tempLocalIpAddress);
+    setIpSubnetMask(tempSn);
+    setIpGatewayAddress(tempGw);
+    setIpDnsAddress(tempGw);
+
+    // Socket info
+    // TODO: Write function that does all of the socket stuff
+
+    // IP
+    s.remoteIpAddress[0] = tempGw[0];
+    s.remoteIpAddress[1] = tempGw[1];
+    s.remoteIpAddress[2] = tempGw[2];
+    s.remoteIpAddress[3] = tempGw[3];
+
+    // Ports
+    s.remotePort = 1883; // MQTT Port
+    s.localPort = 50010; // Gets random port, start at 50000 for testing
+
+    // SEQ/ACK Nums
+    s.sequenceNumber = htonl(2); // Starts at 1
+    s.acknowledgementNumber = htonl(0); // Will be set by the server
+
+    // State
+    s.state = TCP_CLOSED; // Closed on startup
+
+    bool testMqtt = true;
+
     // Main Loop
     // RTOS and interrupts would greatly improve this code,
     // but the goal here is simplicity
-
-   // uint8_t i = 0;
-//    i = countTimers();
-//    snprintf(str, sizeof(str), "Total Counters %d\n",i);
-//    putsUart0(str);
-
     while (true)
     {
         // Put terminal processing here
@@ -505,14 +558,23 @@ int main(void)
         // DHCP maintenance
         if (isDhcpEnabled())
         {
-
             sendDhcpPendingMessages(data);
         }
 
         // TCP pending messages
-        sendTcpPendingMessages(data);
+        sendTcpPendingMessages(data, &s);
 
-        // Packet processing
+        // TESTING MQTT CONNECTION - DELETE AFTER
+        if (getTcpState(0) == TCP_ESTABLISHED && testMqtt)
+        {
+            connectMqtt(data, &s);
+            waitMicrosecond(1e6);
+            // Publish topic "test", message "hello"
+            publishMqtt(data, &s, "test", "hello");
+            while(1);
+        }
+
+        // Packet processings
         if (isEtherDataAvailable())
         {
             if (isEtherOverflow())
@@ -535,7 +597,7 @@ int main(void)
             if (isArpResponse(data))
             {
                 processDhcpArpResponse(data);
-                processTcpArpResponse(data);
+                processTcpArpResponse(data, &s);
             }
 
             // Handle IP datagram
@@ -549,21 +611,23 @@ int main(void)
                         sendPingResponse(data);
                     }
 
-                     //Handle UDP datagram
-//                    if (isUdp(data))
-//                    {
-//                        udpData = getUdpData(data);
-//                        if (strcmp((char*)udpData, "on") == 0)
-//                            setPinValue(GREEN_LED, 1);
-//                        if (strcmp((char*)udpData, "off") == 0)
-//                            setPinValue(GREEN_LED, 0);
-//                        getSocketInfoFromUdpPacket(data, &s);
-//                        sendUdpMessage(data, s, (uint8_t*)"Received", 9);
-//                    }
+                    // Handle UDP datagram
+                    if (isUdp(data))
+                    {
+                        udpData = getUdpData(data);
+                        if (strcmp((char*)udpData, "on") == 0)
+                            setPinValue(GREEN_LED, 1);
+                        if (strcmp((char*)udpData, "off") == 0)
+                            setPinValue(GREEN_LED, 0);
+                        getSocketInfoFromUdpPacket(data, &s);
+                        sendUdpMessage(data, s, (uint8_t*)"Received", 9);
+                    }
 
                     // Handle TCP datagram
                     if (isTcp(data))
                     {
+                        processTcpResponse(data, &s);
+                        // processTcpResponse(data, &s);
                         if (isTcpPortOpen(data))
                         {
                         }
@@ -572,19 +636,13 @@ int main(void)
                     }
                 }
             	// Handle DHCP response
-             //   else
-               // {
+                else
+                {
                     if (isUdp(data))
                         if (isDhcpResponse(data))
-
                             processDhcpResponse(data);
-//                        i = countTimers();
-//                        snprintf(str, sizeof(str), " Timers in use in processDHCP_Res %d\n",i);
-//                        putsUart0(str);
-                //}
+                }
             }
         }
     }
-
 }
-
