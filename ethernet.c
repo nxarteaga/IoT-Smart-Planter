@@ -454,8 +454,6 @@ void processShell()
 
 int main(void)
 {
-    uint8_t i = 0;
-
     initHw();
 
     initUart0();
@@ -465,41 +463,36 @@ int main(void)
 
     initPlant();
 
+    uint16_t lux = 0;
+    uint8_t temp = 0, hum = 0;
+    uint16_t moist = 0, volume = 0;
+
+    setWaterPumpSpeed(255);
+
     while(1)
     {
-        /*
+        getPlantData(&lux, &temp, &hum, &moist, &volume);
+
         // BH1750
-        snprintf(strInput, sizeof(strInput), "Lux: %"PRIu16"\n", getBH1750Lux());
+        snprintf(strInput, sizeof(strInput), "Lux: %"PRIu16" lx\n", lux);
         putsUart0(strInput);
-        */
 
-        /*
         // DHT22
-        snprintf(strInput, sizeof(strInput), "Temperature: %f\n", getDHT22Temp());
-        putsUart0(strInput);
-        snprintf(strInput, sizeof(strInput), "Humidity: %f\n", getDHT22Hum());
-        putsUart0(strInput);
-        */
+        snprintf(strInput, sizeof(strInput), "Temperature: %"PRIu8" C\n", temp);
 
-        /*
-        // Soil Moisture
-        snprintf(strInput, sizeof(strInput), "Moisture: %f\n", getSoilMoisture());
         putsUart0(strInput);
-        */
+        snprintf(strInput, sizeof(strInput), "Humidity: %"PRIu8"%%\n", hum);
+        putsUart0(strInput);
+
+        // Soil Moisture
+        snprintf(strInput, sizeof(strInput), "Moisture: %"PRIu16"%%\n", moist);
+        putsUart0(strInput);
 
         // HX711
-        snprintf(strInput, sizeof(strInput), "Volume: %"PRIu32" mL\n", getHX711Volume());
+        snprintf(strInput, sizeof(strInput), "Volume: %"PRIu32" mL\n\n", volume);
         putsUart0(strInput);
 
-        /*
-        // Water Pump
-        for (i = 0; i < 5; i++)
-        {
-            setWaterPumpSpeed(254 * i);
-        }
-        */
-
-        waitMicrosecond(2000000);
+        waitMicrosecond(1e5);
     }
 }
 

@@ -15,8 +15,8 @@
  * - AOUT -> PE0
  * 
  * Water Pump Motor:
- * - IN1 -> PF2
- * - IN2 -> PF3
+ * - EN -> PF2
+ * - PH -> PF3
  * - Motor +- on either MOTOR-A pins
  * 
  * HX711 Weight Sensor:
@@ -73,18 +73,24 @@
 #define HX_SCK_PIN PORTE, 2     // PD Clock pin
 #define HX_AVG_BUFF_SIZE 5
 
+// Plant
+#define PLANT_SAMPLE_TIME_S 1
+
 // Variables ------------------------------------------------------------------
 
 // DHT22 Temperature and Humidity Sensor
 bool DHT22ready = true;     // Flag for sensor readiness
 
 // Capacitive Soil Moisture Sensor
-const float moistureMin = 1280.0; // Minimum value from the ADC (Water)
-const float moistureMax = 2970.0; // Maximum value from the ADC (Air)
+const uint16_t moistureMin = 1550; // Minimum value from the ADC (Water)
+const uint16_t moistureMax = 2750; // Maximum value from the ADC (Air)
 
 // HX711 Weight Sensor
-const uint32_t hx711Base = 330750;
-const uint16_t hx711Scaler = 52;
+const uint32_t hx711Base = 327000;
+const uint16_t hx711Scaler = 457;
+
+// Plant
+bool samplePlant = true;
 
 // Structures -----------------------------------------------------------------
 
@@ -99,9 +105,8 @@ typedef struct _dht22Data
 // Functions ------------------------------------------------------------------
 
 // BH1750 Ambient Light Sensor
-// TODO: Use 120ms timer for BH1750
-// TODO: Add i2c error checking
-// FIXME: Move BH1750 to I2C1 as it conflicts with ether
+// TODO : Add i2c error checking
+// FIXME : Move BH1750 to I2C1 as it conflicts with eth0
 
 // Initializes the BH1750 Ambient Light sensor
 void initBH1750(void)
@@ -131,13 +136,12 @@ uint16_t getBH1750Lux(void)
     uint16_t lux = ((data[0] << 8) | data[1]) / 1.2;
 
     // Waits 120ms between readings for high res mode
-    waitMicrosecond(BH_H_MEASUREMENT_DELAY_US);
+    // waitMicrosecond(BH_H_MEASUREMENT_DELAY_US);
 
     return lux;
 }
 
 // DHT22 Temperature and Humidity Sensor
-// TODO: Further test DHT22
 
 // Initalizes the DHT22 Temperature and Humidity sensor
 void initDHT22(void)
@@ -159,119 +163,123 @@ void callbackDHT22(void)
 // Reads and stores the 40 bits of data from the DHT22 sensor
 bool readDHT22Data(dht22Data *data)
 {
-    // Blocking function that waits until sensor is ready
-    while (!DHT22ready)
-    {
-    }
-
     bool ok = false;
-    volatile uint8_t mask = 0;
-    volatile uint8_t count = 0;
 
-    // Variables used for debugging, will get removed on final version
-    volatile bool data_bits[40];
-    uint8_t i = 0;
-    for (i = 0; i < 40; i++)
+    // Blocking function that waits until sensor is ready
+    if (DHT22ready)
     {
-        data_bits[i] = 0;
-    }
-    volatile uint8_t counter_high_seg[40];
-    volatile uint8_t counter_low_seg[40];
-    volatile uint8_t counter_high = 0;
-    volatile uint8_t counter_low = 0;
+        volatile uint8_t mask = 0;
+        volatile uint8_t count = 0;
 
-    // Sends start signal to the sensor
-    setPinValue(DH_OUT_PIN, 0);
-    waitMicrosecond(1000);
-    setPinValue(DH_OUT_PIN, 1);
-    waitMicrosecond(25);
-
-    // Receive ready signal from sensor
-    selectPinDigitalInput(DH_OUT_PIN); // Input mode to receive data
-    waitMicrosecond(35);
-    bool ready_low = getPinValue(DH_OUT_PIN); // Expecting low value
-    waitMicrosecond(70);
-    bool ready_high = getPinValue(DH_OUT_PIN); // Expecting high value
-    waitMicrosecond(45);
-
-    // Checks if ready signals were correct
-    if (!ready_low && ready_high)
-    {
-        ok = true;
-    }
-
-    // Begin data transmission if ready signal was correct
-    if (ok)
-    {
-        for (mask = 0; mask < 40; mask++)
+        // Variables used for debugging, will get removed on final version
+        volatile bool data_bits[40];
+        uint8_t i = 0;
+        for (i = 0; i < 40; i++)
         {
-            // Blocking function while signal is low
-            while (!getPinValue(DH_OUT_PIN))
-            {
-                counter_low++;
-            }
-            counter_low_seg[mask] = counter_low;
-            counter_low = 0;
+            data_bits[i] = 0;
+        }
+        volatile uint8_t counter_high_seg[40];
+        volatile uint8_t counter_low_seg[40];
+        volatile uint8_t counter_high = 0;
+        volatile uint8_t counter_low = 0;
 
-            // Counts how long the signal is high
-            while (getPinValue(DH_OUT_PIN))
-            {
-                counter_high++;
-            }
-            // If the signal is high for more than 50 cycles, it's 1
-            if (counter_high > 50)
-            {
-                // Humidity bitmask
-                if (mask < 16)
-                {
-                    data->hum |= (1 << 15 - mask);
-                }
-                // Temperature bitmask
-                else if (mask < 32)
-                {
-                    data->temp |= (1 << 15 - (mask - 16));
-                }
-                // Checksum bitmask
-                else if (mask < 40)
-                {
-                    data->checksum |= (1 << 7 - (mask - 32));
-                }
+        // Sends start signal to the sensor
+        setPinValue(DH_OUT_PIN, 0);
+        waitMicrosecond(1000);
+        setPinValue(DH_OUT_PIN, 1);
+        waitMicrosecond(25);
 
-                data_bits[mask] = 1;
-            }
-            // Reset count for next bit
-            counter_high_seg[mask] = counter_high;
-            counter_high = 0;
+        // Receive ready signal from sensor
+        selectPinDigitalInput(DH_OUT_PIN); // Input mode to receive data
+        waitMicrosecond(35);
+        bool ready_low = getPinValue(DH_OUT_PIN); // Expecting low value
+        waitMicrosecond(70);
+        bool ready_high = getPinValue(DH_OUT_PIN); // Expecting high value
+        waitMicrosecond(45);
+
+        // Checks if ready signals were correct
+        if (!ready_low && ready_high)
+        {
+            ok = true;
         }
 
-        // Calculate and verify checksum
-        // Broken up to make it easier to read
-        // Checksum =
-        // ((h & 0xFF) + (h & 0xFF00 >> 8) + (t & 0xFF) + (t & 0xFF00 >> 8)) & 0xFF
-        uint16_t check = 0;
-        check = (data->hum & 0xFF) + ((data->hum & 0xFF00) >> 8);
-        check = check + (data->temp & 0xFF) + ((data->temp & 0xFF00) >> 8);
-        check = check & 0xFF;
-
-        // If incorrect, will return false
-        if (check != data->checksum)
+        // Begin data transmission if ready signal was correct
+        if (ok)
         {
-            ok = false;
+            for (mask = 0; mask < 40; mask++)
+            {
+                // Blocking function while signal is low
+                while (!getPinValue(DH_OUT_PIN))
+                {
+                    counter_low++;
+                }
+                counter_low_seg[mask] = counter_low;
+                counter_low = 0;
+
+                // Counts how long the signal is high
+                while (getPinValue(DH_OUT_PIN))
+                {
+                    counter_high++;
+                }
+                // If the signal is high for more than 50 cycles, it's 1
+                if (counter_high > 50)
+                {
+                    // Humidity bitmask
+                    if (mask < 16)
+                    {
+                        data->hum |= (1 << 15 - mask);
+                    }
+                    // Temperature bitmask
+                    else if (mask < 32)
+                    {
+                        data->temp |= (1 << 15 - (mask - 16));
+                    }
+                    // Checksum bitmask
+                    else if (mask < 40)
+                    {
+                        data->checksum |= (1 << 7 - (mask - 32));
+                    }
+
+                    data_bits[mask] = 1;
+                }
+                // Reset count for next bit
+                counter_high_seg[mask] = counter_high;
+                counter_high = 0;
+            }
+
+            // Calculate and verify checksum
+            // Broken up to make it easier to read
+            // Checksum =
+            // ((h & 0xFF) + (h & 0xFF00 >> 8) + (t & 0xFF) + (t & 0xFF00 >> 8)) & 0xFF
+            uint16_t check = 0;
+            check = (data->hum & 0xFF) + ((data->hum & 0xFF00) >> 8);
+            check = check + (data->temp & 0xFF) + ((data->temp & 0xFF00) >> 8);
+            check = check & 0xFF;
+
+            // If incorrect, will return false
+            if (check != data->checksum)
+            {
+                ok = false;
+            }
         }
+
+        // Outputs 1 as to wait for next data transmission
+        selectPinPushPullOutput(DH_OUT_PIN);
+        setPinValue(DH_OUT_PIN, 1);
+
+        startOneshotTimer(callbackDHT22, DH_WAIT_TIME_SECONDS);
+        DHT22ready = false;
     }
-
-    // Outputs 1 as to wait for next data transmission
-    selectPinPushPullOutput(DH_OUT_PIN);
-    setPinValue(DH_OUT_PIN, 1);
-
-    startOneshotTimer(callbackDHT22, DH_WAIT_TIME_SECONDS);
-    DHT22ready = false;
+    else
+    {
+        ok = false;
+    }
 
     return ok;
 }
 
 // Gets the temperature in Celcius from the DHT22 sensor
-float getDHT22Temp(void)
+uint8_t getDHT22Temp(void)
 {
     // Struct that holds sensor data
     dht22Data data;
@@ -280,24 +288,19 @@ float getDHT22Temp(void)
     data.hum = 0;
 
     // Return value
-    float temp = 0.0;
+    static uint8_t temp = 0;
 
     // Returns temperature in Celcius, rounded to 1 decimal place
     if (readDHT22Data(&data))
     {
-        temp = (float)data.temp / 10;
-    }
-    // Indicates an error
-    else
-    {
-        temp = 999.9;
+        temp = data.temp / 10;
     }
 
     return temp;
 }
 
 // Gets the humidity in percentage from the DHT22 sensor
-float getDHT22Hum(void)
+uint8_t getDHT22Hum(void)
 {
     // Struct that holds sensor data
     dht22Data data;
@@ -306,23 +309,35 @@ float getDHT22Hum(void)
     data.hum = 0;
 
     // Return value
-    float hum = 0.0;
+    static uint8_t hum = 0.0;
 
     // Returns humidity in percentage, rounded to 1 decimal place
     if (readDHT22Data(&data))
     {
-        hum = (float)data.hum / 10;
-    }
-    // Indicates an error
-    else
-    {
-        hum = 999.9;
+        hum = data.hum / 10;
     }
 
     return hum;
 }
 
+void getDHT22TempAndHum(uint8_t *temp, uint8_t *hum)
+{
+    // Struct that holds sensor data
+    dht22Data data;
+    data.checksum = 0;
+    data.temp = 0;
+    data.hum = 0;
+
+    // Returns humidity in percentage, rounded to 1 decimal place
+    if (readDHT22Data(&data))
+    {
+        *hum = data.hum / 10;
+        *temp = data.temp / 10;
+    }
+}
+
 // Capacitive Soil Moisture Sensor
+// TODO : Moisture sensor circular buffer for averaging
 
 // Initializes the Capacitive Soil Moisture sensor
 void initSoilMoistureSensor(void)
@@ -340,21 +355,27 @@ void initSoilMoistureSensor(void)
 }
 
 // Gets the soil moisture percentage from the Capacitive Soil Moisture sensor
-float getSoilMoisture(void)
+uint16_t getSoilMoisture(void)
 {
     // Stores raw value from the ADC
-    float raw = (float)readAdc0Ss3();
+    uint16_t raw = readAdc0Ss3();
     // Return value with calculated percentage
-    float moisture = 0.0;
+    uint16_t moisture = 0;
 
     // Calculates percentage: (1 - (raw - min) / (max - min)) * 100
-    moisture = (1 - (raw - moistureMin) / (moistureMax - moistureMin) ) * 100;
+    moisture = ((moistureMax - raw) * 100) / (moistureMax - moistureMin);
     
     return moisture;
 }
 
+// Returns raw value from the Capacitive Soil Moisture sensor
+uint32_t getSoilMoistureRaw(void)
+{
+    return readAdc0Ss3();
+}
+
 // Water Pump Motor
-// TODO: Make sure water pump actually pumps water correctly lol
+// TODO : Make sure water pump actually pumps water correctly lol
 
 // Initializes the water pump for PWM control
 void initWaterPump(void)
@@ -392,7 +413,7 @@ void setWaterPumpSpeed(uint16_t duty)
 }
 
 // HX711 Weight Sensor
-// TODO: Finish writing HX711 functions
+// FIXME : Calibrate HX711
 
 // Initializes the HX711
 void initHX711(void)
@@ -430,6 +451,7 @@ uint32_t readHX711Data(void)
 }
 
 // Calculates and returns the volume in milliliters from the HX711
+// FIXME: Volume overflow
 uint16_t getHX711Volume(void)
 {
     // Gets data from HX711 and calculates the current volume
@@ -443,7 +465,10 @@ uint16_t getHX711Volume(void)
 // Returns raw value from the HX711
 uint32_t getHX711Raw(void)
 {
-    return (readHX711Data() - hx711Base);
+    uint32_t value = readHX711Data();
+    value -= hx711Base;
+
+    return value;
 }
 
 // Plant
@@ -451,10 +476,31 @@ uint32_t getHX711Raw(void)
 // Initializes the plant peripherals
 void initPlant(void)
 {
-    // initBH1750();
-    // initDHT22();
-    // initSoilMoistureSensor();
-    // initWaterPump();
+    initBH1750();
+    initDHT22();
+    initSoilMoistureSensor();
+    initWaterPump();
     initHX711();
 }
 
+// Callback function for plant sample flag
+void callbackSamplePlant(void)
+{
+    samplePlant = true;
+    KillTimer(callbackSamplePlant);
+}
+
+// Gets and updates the plant data every PLANT_SAMPLE_TIME_S seconds
+void getPlantData(uint16_t *lux, uint8_t *temp, uint8_t *hum, uint16_t *moist, uint16_t *volume)
+{
+    if (samplePlant)
+    {
+        *lux = getBH1750Lux();
+        getDHT22TempAndHum(temp, hum);
+        *moist = getSoilMoisture();
+        *volume = getHX711Volume();
+
+        samplePlant = false;
+        startOneshotTimer(callbackSamplePlant, PLANT_SAMPLE_TIME_S);
+    }
+}
