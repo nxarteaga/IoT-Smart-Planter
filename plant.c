@@ -2,25 +2,29 @@
  * Rolando Rosales 1001850424 - CSE 4352 "IoT Smart Planter" Peripheral Library
  * 
  * Hardware setup:
- * BH1750 Ambient Light Sensor:
- * - SCL -> PA6
- * - SDA -> PA7
- * - ADDR -> NC/GND
- * - 2k Ohm Pull-up resistors on SDA and SCL
- * 
- * DHT22 Temperature and Humidity Sensor:
- * - out -> PD2
- * 
- * Capacitive Soil Moisture Sensor:
- * - AOUT -> PE0
- * 
- * Water Pump Motor:
- * - EN -> PF2
- * - PH -> PF3
- * 
- * HX711 Weight Sensor:
- * - DT -> PE1
- * - SCK -> PE2
+ * BH1750 to TM4C:
+ *  - SCL -> PA6
+ *  - SDA -> PA7
+ *  - ADDR -> NC/GND
+ *  - 2k Ohm Pull-up resistors on SDA and SCL
+ * DHT22 to TM4C:
+ *  - out -> PD2
+ * Soil Moisture Sensor to TM4C:
+ *  - AOUT -> PE0
+ * Water Pump Motor to DRV8838
+ *  - Red -> O2
+ *  - Black -> O1
+ * DRV8838 to TM4C:
+ *  - EN -> PF2
+ *  - PH -> PF3
+ * Load Cell to HX711
+ *  - Red -> E+
+ *  - Black -> E-
+ *  - White -> A-
+ *  - Green -> A+
+ * HX711 to TM4C:
+ *  - DT -> PE1
+ *  - SCK -> PE2
 */
 
 // Libraries ------------------------------------------------------------------
@@ -58,7 +62,7 @@
 
 // DHT22 Temperature and Humidity Sensor
 #define DH_OUT_PIN PORTD, 2     // Data output pin
-#define DH_WAIT_TIME_SECONDS 2      // Time in seconds to wait for sensor to be ready
+#define DH_WAIT_TIME_SECONDS 2  // Time in seconds to wait for sensor to be ready
 
 // Capacitive Soil Moisture Sensor
 #define SM_AOUT_PIN PORTE, 0    // Analog output pin
@@ -285,7 +289,7 @@ uint8_t getDHT22Temp(void)
     // Return value
     static uint8_t temp = 0;
 
-    // Returns temperature in Celcius, rounded to 1 decimal place
+    // Returns temperature in Celcius
     if (readDHT22Data(&data))
     {
         temp = data.temp / 10;
@@ -306,7 +310,7 @@ uint8_t getDHT22Hum(void)
     // Return value
     static uint8_t hum = 0.0;
 
-    // Returns humidity in percentage, rounded to 1 decimal place
+    // Returns humidity in percentage
     if (readDHT22Data(&data))
     {
         hum = data.hum / 10;
@@ -323,7 +327,7 @@ void getDHT22TempAndHum(uint8_t *temp, uint8_t *hum)
     data.temp = 0;
     data.hum = 0;
 
-    // Returns humidity in percentage, rounded to 1 decimal place
+    // Returns humidity in percentage
     if (readDHT22Data(&data))
     {
         *hum = data.hum / 10;
@@ -332,7 +336,6 @@ void getDHT22TempAndHum(uint8_t *temp, uint8_t *hum)
 }
 
 // Capacitive Soil Moisture Sensor
-// TODO : Moisture sensor circular buffer for averaging
 
 // Initializes the Capacitive Soil Moisture sensor
 void initSoilMoistureSensor(void)
@@ -408,7 +411,6 @@ void setWaterPumpSpeed(uint16_t duty)
 }
 
 // HX711 Weight Sensor
-// FIXME : Calibrate HX711
 
 // Initializes the HX711
 void initHX711(void)
@@ -446,7 +448,6 @@ uint32_t readHX711Data(void)
 }
 
 // Calculates and returns the volume in milliliters from the HX711
-// FIXME: Volume overflow
 uint16_t getHX711Volume(void)
 {
     // Gets data from HX711 and calculates the current volume
@@ -490,11 +491,13 @@ void getPlantData(uint16_t *lux, uint8_t *temp, uint8_t *hum, uint16_t *moist, u
 {
     if (samplePlant)
     {
+        // Updates plant data for each sensor
         *lux = getBH1750Lux();
         getDHT22TempAndHum(temp, hum);
         *moist = getSoilMoisture();
         *volume = getHX711Volume();
 
+        // Starts timer for next sample
         samplePlant = false;
         startOneshotTimer(callbackSamplePlant, PLANT_SAMPLE_TIME_S);
     }
