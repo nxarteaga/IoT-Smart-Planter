@@ -3,10 +3,10 @@
  * 
  * Hardware setup:
  * BH1750 Ambient Light Sensor:
- * - SCL -> PB2
- * - SDA -> PB3
- * - ADDR -> GND
- * - 4.7k Pull-up resistors on SDA and SCL
+ * - SCL -> PA6
+ * - SDA -> PA7
+ * - ADDR -> NC/GND
+ * - 2k Ohm Pull-up resistors on SDA and SCL
  * 
  * DHT22 Temperature and Humidity Sensor:
  * - out -> PD2
@@ -17,7 +17,6 @@
  * Water Pump Motor:
  * - EN -> PF2
  * - PH -> PF3
- * - Motor +- on either MOTOR-A pins
  * 
  * HX711 Weight Sensor:
  * - DT -> PE1
@@ -29,7 +28,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "tm4c123gh6pm.h"
-#include "i2c0.h"
+#include "i2c1.h"
 #include "gpio.h"
 #include "timer.h"
 #include "wait.h"
@@ -111,13 +110,13 @@ typedef struct _dht22Data
 // Initializes the BH1750 Ambient Light sensor
 void initBH1750(void)
 {
-    initI2c0();
+    initI2c1();
 
     // BH1750 Startup
-    writeI2c0Data(BH_ADDRESS_GND, BH_POWER_ON);
-    writeI2c0Data(BH_ADDRESS_GND, BH_RESET);
+    writeI2c1Data(BH_ADDRESS_GND, BH_POWER_ON);
+    writeI2c1Data(BH_ADDRESS_GND, BH_RESET);
     // Sets mode to 120ms 1lx resolution
-    writeI2c0Data(BH_ADDRESS_GND, BH_CONTINUOUS_H_RES_MODE_1);
+    writeI2c1Data(BH_ADDRESS_GND, BH_CONTINUOUS_H_RES_MODE_1);
 
     // Waits 120ms between readings for high res mode
     waitMicrosecond(BH_H_MEASUREMENT_DELAY_US);
@@ -130,7 +129,7 @@ uint16_t getBH1750Lux(void)
     uint8_t data[2];
 
     // Gets sensor data and stores it
-    readI2c0Registers(BH_ADDRESS_GND, BH_CONTINUOUS_H_RES_MODE_1, data, 2);
+    readI2c1Registers(BH_ADDRESS_GND, BH_CONTINUOUS_H_RES_MODE_1, data, 2);
 
     // Calculates lux value from sensor data
     uint16_t lux = ((data[0] << 8) | data[1]) / 1.2;
