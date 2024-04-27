@@ -90,7 +90,7 @@ const uint16_t moistureMin = 1550;  // Minimum value from the ADC (Water)
 const uint16_t moistureMax = 2750;  // Maximum value from the ADC (Air)
 
 // HX711 Weight Sensor
-const uint32_t hx711Base = 327200;  // Minimum value from HX711
+const uint32_t hx711Base = 327000;  // Minimum value from HX711
 const uint16_t hx711Scaler = 428;   // Raw ADC to volume scale (div) value
 
 // Plant
@@ -357,7 +357,7 @@ void initSoilMoistureSensor(void)
 uint16_t getSoilMoisture(void)
 {
     // Circular buffer variables
-    static uint16_t buff[SM_AVG_BUFF_SIZE] = {0, 0, 0, 0, 0};
+    static uint16_t buff[SM_AVG_BUFF_SIZE] = {0};
     static uint32_t sum = 0;
     static uint8_t i = 0;
     static uint16_t moisture_avg = 0;
