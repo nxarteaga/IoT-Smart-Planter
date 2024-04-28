@@ -18,40 +18,19 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "eth0.h"
-#include "tcp.h"
 #include "mqtt.h"
+#include "tcp.h"
+#include "socket.h" 
+#include "ip.h"
+#include "eth0.h"
 #include "timer.h"
 
-
-//IMPORTANT
-//Code QS1 for MQTT
-//TYPES OF MESSAGES
-#define MQTT_CONNECT 0
-#define MQTT_CONNACK 1
-#define MQTT_PUBLISH 2
-#define MQTT_PUBACK 3
-#define MQTT_PUBREC 4
-#define MQTT_PUBREL 5
-#define MQTT_PUBCOMP 6
-#define MQTT_SUBSCRIBE 7
-#define MQTT_SUBACK 8
-#define MQTT_UNSUBSCRIBE 9
-#define MQTT_UNSUBACK 10
-#define MQTT_PINGREQ 11
-#define MQTT_PINGRESP 12
-#define MQTT_DISCONNECT 13
-#define MQTT_AUTH 14
-
-
-
-
+#define MAX_BUFF_SIZE 64
 
 // ------------------------------------------------------------------------------
 //  Globals
 // ------------------------------------------------------------------------------
-//bool mqttOptionFieldFlags = true;//
-uint8_t mqttMessageType = 0;
+
 // ------------------------------------------------------------------------------
 //  Structures
 // ------------------------------------------------------------------------------
@@ -60,144 +39,180 @@ uint8_t mqttMessageType = 0;
 // Subroutines
 //-----------------------------------------------------------------------------
 
-//void connectMqtt(etherHeader *ether, uint8_t *data, uint16_t size)
-//{
-//}
-void setMqttState(uint8_t state)
+void connectMqtt(etherHeader *ether, socket *s)
 {
-    mqttMessageType = state;
+    // MQTT "Header"
+    uint8_t buffer[MAX_BUFF_SIZE];
+    mqttHeader* mqtt = (mqttHeader*) buffer;
+
+    mqtt->headerFlags = 0x10;   // Connect Flag
+
+    // MQTT Connect Payload
+    mqttConnect *payload = (mqttConnect*) mqtt->lengthPayload;
+
+    payload->protocolNameLength = htons(0x0004);    // Length of MQTT
+    payload->protocolName[0] = 0x4D;                // M
+    payload->protocolName[1] = 0x51;                // Q
+    payload->protocolName[2] = 0x54;                // T
+    payload->protocolName[3] = 0x54;                // T
+    payload->version = 0x04;                        // Version v3.1.1
+    payload->connectFlags = 0x02;                   // Clean session... More suitable for Publish only client.
+    payload->keepAlive = htons(0x003c);             // Keep alive 60s
+    payload->clientIdLength = htons(0x0);           // Length of client ID
+
+    // adjust lengths
+    mqtt->msgLen = sizeof(mqttConnect);        
+    uint8_t dataSize = sizeof(mqttHeader) + mqtt->msgLen;
+
+    // Send the MQTT Connect message
+    sendTcpMessage(ether, s, PSH | ACK, (uint8_t *)mqtt, dataSize);
 }
 
-uint8_t getMqttState()
+void disconnectMqtt(etherHeader *ether, socket *s)
 {
-    return mqttMessageType;
+    // MQTT "Header"
+    uint8_t buffer[MAX_BUFF_SIZE];
+    mqttHeader* mqtt = (mqttHeader*) buffer;
+
+    mqtt->headerFlags = 0x10;   // Connect Flag
+    mqtt->lengthPayload[0] = 0x0;
+
+    // adjust lengths
+    mqtt->msgLen = 0x0;    
+    uint8_t dataSize = sizeof(mqttHeader) + mqtt->msgLen;
+
+    sendTcpMessage(ether, s, PSH | ACK, (uint8_t *)mqtt, dataSize);
 }
-void connectMqtt()
+
+void publishMqtt(etherHeader *ether, socket *s, char strTopic[], char strData[])
 {
+    // MQTT "Header"
+    uint8_t buffer[MAX_BUFF_SIZE];
+    mqttHeader* mqtt = (mqttHeader*) buffer;
+    uint16_t payloadSize = 0;
+    char *strPtr;
+    char *payloadPtr;
 
-    setMqttState(MQTT_CONNECT);
+    mqtt->headerFlags = 0x30;   // Connect Flag
 
+    // MQTT Publish Payload
+    mqttPublish *payload = (mqttPublish*) mqtt->lengthPayload;
+
+    strPtr = strTopic;  // Point to the start of topic to be copied
+    payloadPtr = payload->topic; // Point to the start of topic in payload
+
+    // Topic name loop
+    while (*strPtr)
+    {
+        payloadSize++;          // Increment the payload size
+        *payloadPtr = *strPtr;  // Copy the topic name
+        
+        // Move pointer
+        payloadPtr++;
+        strPtr++;
+    }
+
+    payload->topicLength = htons(payloadSize); // Set the topic length
+
+    strPtr = strData;  // Point to the start of message to be copied
+    payloadPtr++; // Point to the start of message in payload
+
+    // FIXME: Adjust length for message (cuts off last character)
+    // Message loop
+    while (*strPtr)
+    {
+        payloadSize++;          // Increment the payload size
+        *payloadPtr = *strPtr;  // Copy the message
+        
+        // Move pointer
+        payloadPtr++;
+        strPtr++;
+    }
+
+    // adjust lengths
+    mqtt->msgLen = sizeof(mqttPublish) + payloadSize;
+    uint8_t dataSize = sizeof(mqttHeader) + mqtt->msgLen;
+
+    // Send the MQTT Connect message
+    sendTcpMessage(ether, s, PSH | ACK, (uint8_t *)mqtt, dataSize);
 }
-//etherHeader *ether, uint8_t *data, uint16_t size
-void sendMqttMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[], uint16_t dataSize)
-{
 
-    uint16_t tcpHeaderLength = 0;
-    uint8_t localHwAddress[6];
-    uint8_t localIpAddress[4];
-        uint8_t i =0;
-        uint32_t sum;
-        uint16_t tmp16;
-        uint16_t tcpLength = 0;
-        //Part of ethernet Frame
-        getEtherMacAddress(localHwAddress);
-        for(i = 0; i < HW_ADD_LENGTH;i++)
-        {
-            //ether->destAddress[i] = ; //Need to figure this one out. Maybe socket *s?
-            ether->destAddress[i] = s->remoteHwAddress[i];
-            ether->sourceAddress[i] = localHwAddress[i];
+void subscribeMqtt(etherHeader *ether, socket *s, char strTopic[])
+{
+    // MQTT "Header"
+    uint8_t buffer[MAX_BUFF_SIZE];
+    mqttSubscribeHeader* mqtt = (mqttSubscribeHeader*) buffer;
+    uint16_t payloadSize = 0;
+    char *strPtr;
+    char *payloadPtr;
+
+    mqtt->headerFlags = 0x82;   // Connect Flag
+    mqtt->MessageIdentifier = htons(10);
+
+    // MQTT Publish Payload
+    mqttSubscribe *payload = (mqttSubscribe*) mqtt->lengthPayload;
+
+    strPtr = strTopic;  // Point to the start of topic to be copied
+    payloadPtr = payload->topic; // Point to the start of topic in payload
+
+    // Topic name loop
+    while (*strPtr)
+       {
+           payloadSize++;          // Increment the payload size
+           *payloadPtr = *strPtr;  // Copy the topic name
+           // Move pointer
+           payloadPtr++;
+           strPtr++;
         }
 
-        ether->frameType = htons(TYPE_IP);
+    *payloadPtr = 0x0; //assigns the value 0 to QoS
 
-        //
-        // IP header
-        ipHeader* ip = (ipHeader*)ether->data;
-        ip->rev = 0x4;
-        ip->size = 0x5;
-        ip->typeOfService = 0;
-        ip->id = 0;
+     // adjust lengths
+    payload->topicLength = htons(payloadSize);// Set the topic length
+    mqtt->msgLen = (sizeof(mqttSubscribeHeader) + payloadSize+1); //add 1 to payload when not using pointer
+    uint8_t dataSize = (sizeof(mqttSubscribe) + mqtt->msgLen);//size of pointer is 8bytes
+    dataSize = dataSize - 2;
+    // Send the MQTT Connect message
+    sendTcpMessage(ether, s, PSH | ACK, (uint8_t *)mqtt, dataSize);
+}
 
-        //ip->flagsAndOffset = htons(16384);
-        ip->flagsAndOffset = 0;
-        ip->ttl = 128; //64 | 128? I think, not sure.verify!!!
-        ip->protocol = PROTOCOL_TCP;
-        ip->headerChecksum = 0;
-        uint8_t ipHeaderLength = ip->size * 4;
-        getIpAddress(localIpAddress);
-        for(i = 0; i < IP_ADD_LENGTH; i++)
-        {
-            ip->sourceIp[i] = localIpAddress[i];
-            //snprintf(str, sizeof(str), "Remote ip address %d\n",s->remoteIpAddress[i]);
-            //putsUart0(str);
-            ip->destIp[i] = s->remoteIpAddress[i]; //once again this might be with socket variable *s
+void unsubscribeMqtt(etherHeader *ether, socket *s, char strTopic[])
+{
+    // MQTT "Header"
+    uint8_t buffer[MAX_BUFF_SIZE];
+    mqttSubscribeHeader* mqtt = (mqttSubscribeHeader*) buffer;
+    uint16_t payloadSize = 0;
+    char *strPtr;
+    char *payloadPtr;
 
+    mqtt->headerFlags = 0xA2;   // Unsubscribe
+    mqtt->MessageIdentifier = htons(11);
+
+    // MQTT Publish Payload
+    mqttSubscribe *payload = (mqttSubscribe*) mqtt->lengthPayload;
+
+    strPtr = strTopic;  // Point to the start of topic to be copied
+    payloadPtr = payload->topic; // Point to the start of topic in payload
+
+    // Topic name loop
+    while (*strPtr)
+       {
+           payloadSize++;          // Increment the payload size
+           *payloadPtr = *strPtr;  // Copy the topic name
+           // Move pointer
+           payloadPtr++;
+           strPtr++;
         }
 
-        //TCP header frame
-        tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip+(ip->size*4));
-        tcp->sourcePort = htons(s->localPort); //use htons here?
-        tcp->destPort = htons(s->remotePort); //
-        tcp->sequenceNumber = s->sequenceNumber;
-        tcp->acknowledgementNumber = s->acknowledgementNumber;
-        //tcp->acknowledgementNumber = ;
-        tcp->windowSize = 1;//htons(0); //how far back I can look to give you stuff that is missing. Small window due to constrains in the redboard.
-        tcp->urgentPointer = 0;
-        tcp->offsetFields = 0;
-        //tcp->offsetFields This is 16bit flag. Some bits need to be changed in here. T
-        setFlags(tcp->offsetFields,flags);
-        //tcpLength = sizeof(tcpHeader)+dataSize;
-        tcpLength = sizeof(tcpHeader)+dataSize; //TCP syn has no data
+    //*payloadPtr = 0x0; //assigns the value 0 to QoS.. Not needed for unsubscribed
 
-        //clears the first 4 upper bits
-        tcp->offsetFields &= ~(0xF000);
-        tcpHeaderLength = ((sizeof(tcpHeader)/4) << OFS_SHIFT);
-        //tcpHeaderLength = (sizeof(tcpHeader)/4);
-        tcp->offsetFields |= tcpHeaderLength;
-        tcp->offsetFields =htons(tcp->offsetFields);
-
-
-        //char client[] = "smartPlant";
-            //tcpHeader *tcp = (tcpHeader*)getTCPHeaderPtr(ether);
-            mqttHeader *mqtt=(mqttHeader*)tcp->data;
-            mqtt->headerFlags = 0x10;
-            mqtt->messageLength = 37;
-            mqtt->protocolNameLength = htons(6);
-            //mqtt->protocolName = "MQIsdp";
-            strcpy(mqtt->protocolName,"MQIsdp");
-            mqtt->version = htons(5);
-            mqtt->connectFlags = 0x02;
-            mqtt->keepAlive = htonl(5);
-            mqtt->clientIdLength = htons(3);
-            mqtt->clientId = 999;
-
-
-
-        ip->length = htons(sizeof(ipHeader)+tcpLength);
-           // 32-bit sum over ip header
-           calcIpChecksum(ip);
-           // set udp length
-          // udp->length = htons(udpLength);
-
-
-           // 32-bit sum over pseudo-header
-           sum = 0;
-           sumIpWords(ip->sourceIp, 8, &sum);
-           tmp16 = ip->protocol;
-           sum += (tmp16 & 0xff) << 8;
-           tmp16 = htons(tcpLength);
-           sumIpWords(&tmp16, 2, &sum);
-           // add udp header
-           tcp->checksum = 0;
-           sumIpWords(tcp, tcpLength, &sum);
-           tcp->checksum = getIpChecksum(sum);
-           putEtherPacket(ether, sizeof(etherHeader) + ipHeaderLength + tcpLength);
-         //  sequenceNumber += dataSize;
-
+     // adjust lengths
+    payload->topicLength = htons(payloadSize);// Set the topic length
+    mqtt->msgLen = (sizeof(mqttSubscribeHeader) + payloadSize); //
+    uint8_t dataSize = (sizeof(mqttSubscribe) + mqtt->msgLen);//size of pointer is 8bytes
+    dataSize = dataSize - 1;
+    // Send the MQTT Connect message
+    sendTcpMessage(ether, s, PSH | ACK, (uint8_t *)mqtt, dataSize);
 
 }
-void disconnectMqtt()
-{
-}
 
-void publishMqtt(char strTopic[], char strData[])
-{
-}
-
-void subscribeMqtt(char strTopic[])
-{
-}
-
-void unsubscribeMqtt(char strTopic[])
-{
-}
