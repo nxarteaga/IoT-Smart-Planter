@@ -87,7 +87,7 @@ bool DHT22ready = true;     // Flag for sensor readiness
 
 // Capacitive Soil Moisture Sensor
 const uint16_t moistureMin = 1550;  // Minimum value from the ADC (Water)
-const uint16_t moistureMax = 2750;  // Maximum value from the ADC (Air)
+const uint16_t moistureMax = 2800;  // Maximum value from the ADC (Air)
 
 // HX711 Weight Sensor
 const uint32_t hx711Base = 327000;  // Minimum value from HX711

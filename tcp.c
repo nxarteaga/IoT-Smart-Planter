@@ -224,6 +224,7 @@ void processTcpResponse(etherHeader *ether, socket *s)
         case TCP_LAST_ACK:
             if (isTcpAck(ether))
             {
+                disableAllLEDs();
                 setTcpState(0, TCP_CLOSED);
             }
             break;

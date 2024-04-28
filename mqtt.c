@@ -74,7 +74,7 @@ void disconnectMqtt(etherHeader *ether, socket *s)
     uint8_t buffer[MAX_BUFF_SIZE];
     mqttHeader* mqtt = (mqttHeader*) buffer;
 
-    mqtt->headerFlags = 0x10;   // Connect Flag
+    mqtt->headerFlags = 0xE0;   // Connect Flag
     mqtt->lengthPayload[0] = 0x0;
 
     // adjust lengths
@@ -115,9 +115,8 @@ void publishMqtt(etherHeader *ether, socket *s, char strTopic[], char strData[])
     payload->topicLength = htons(payloadSize); // Set the topic length
 
     strPtr = strData;  // Point to the start of message to be copied
-    payloadPtr++; // Point to the start of message in payload
+    payloadPtr += 1; // Point to the start of message in payload
 
-    // FIXME: Adjust length for message (cuts off last character)
     // Message loop
     while (*strPtr)
     {
@@ -128,6 +127,7 @@ void publishMqtt(etherHeader *ether, socket *s, char strTopic[], char strData[])
         payloadPtr++;
         strPtr++;
     }
+    payloadSize += 1;
 
     // adjust lengths
     mqtt->msgLen = sizeof(mqttPublish) + payloadSize;
@@ -146,4 +146,3 @@ void unsubscribeMqtt(etherHeader *ether, socket *s, char strTopic[])
 {
 
 }
-
