@@ -31,6 +31,8 @@
 //  Globals
 // ------------------------------------------------------------------------------
 
+bool mqttConnected = false;
+
 // ------------------------------------------------------------------------------
 //  Structures
 // ------------------------------------------------------------------------------
@@ -70,11 +72,14 @@ void connectMqtt(etherHeader *ether, socket *s)
 
 void disconnectMqtt(etherHeader *ether, socket *s)
 {
+
+    mqttConnected = false;
+
     // MQTT "Header"
     uint8_t buffer[MAX_BUFF_SIZE];
     mqttHeader* mqtt = (mqttHeader*) buffer;
 
-    mqtt->headerFlags = 0x10;   // Connect Flag
+    mqtt->headerFlags = 0xE0;   // Connect Flag
     mqtt->lengthPayload[0] = 0x0;
 
     // adjust lengths
@@ -102,7 +107,7 @@ void publishMqtt(etherHeader *ether, socket *s, char strTopic[], char strData[])
     payloadPtr = payload->topic; // Point to the start of topic in payload
 
     // Topic name loop
-    while (*strPtr)
+    while (*strPtr != NULL)
     {
         payloadSize++;          // Increment the payload size
         *payloadPtr = *strPtr;  // Copy the topic name
@@ -115,11 +120,10 @@ void publishMqtt(etherHeader *ether, socket *s, char strTopic[], char strData[])
     payload->topicLength = htons(payloadSize); // Set the topic length
 
     strPtr = strData;  // Point to the start of message to be copied
-    payloadPtr++; // Point to the start of message in payload
+    // payloadPtr += 1; // Point to the start of message in payload
 
-    // FIXME: Adjust length for message (cuts off last character)
     // Message loop
-    while (*strPtr)
+    while (*strPtr != NULL)
     {
         payloadSize++;          // Increment the payload size
         *payloadPtr = *strPtr;  // Copy the message
@@ -128,7 +132,8 @@ void publishMqtt(etherHeader *ether, socket *s, char strTopic[], char strData[])
         payloadPtr++;
         strPtr++;
     }
-
+    // payloadSize += 1;
+  
     // adjust lengths
     mqtt->msgLen = sizeof(mqttPublish) + payloadSize;
     uint8_t dataSize = sizeof(mqttHeader) + mqtt->msgLen;
@@ -213,6 +218,28 @@ void unsubscribeMqtt(etherHeader *ether, socket *s, char strTopic[])
     dataSize = dataSize - 1;
     // Send the MQTT Connect message
     sendTcpMessage(ether, s, PSH | ACK, (uint8_t *)mqtt, dataSize);
+}
 
+void checkMqttConAck(etherHeader *ether, socket *s)
+{
+    tcpHeader* tcp = getTcpHeaderPtr(ether);
+    uint8_t headerFlags = tcp->data[0];
+
+    if (headerFlags == 0x20)
+    {
+        // updateTcpSeqAck(ether, s);
+        s->acknowledgementNumber += 4;
+        sendAck();
+        mqttConnected = true;
+    }
+    else
+    {
+        mqttConnected = false;
+    }
+}
+
+bool isMqttConAcked()
+{
+    return mqttConnected;
 }
 

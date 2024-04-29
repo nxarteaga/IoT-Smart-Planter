@@ -50,7 +50,6 @@ typedef struct _mqttPublish
     char message[0];
 } mqttPublish;
 
-
 typedef struct _mqttSubscribeHeader
 {
     uint8_t headerFlags;
@@ -67,7 +66,6 @@ typedef struct _mqttSubscribe
     uint8_t qos;
 } mqttSubscribe;
 
-
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------
@@ -77,6 +75,8 @@ void disconnectMqtt(etherHeader *ether, socket *s);
 void publishMqtt(etherHeader *ether, socket *s, char strTopic[], char strData[]);
 void subscribeMqtt(etherHeader *ether, socket *s, char strTopic[]);
 void unsubscribeMqtt(etherHeader *ether, socket *s, char strTopic[]);
+void checkMqttConAck(etherHeader *ether, socket *s);
+bool isMqttConAcked(void);
 
 #endif
 
