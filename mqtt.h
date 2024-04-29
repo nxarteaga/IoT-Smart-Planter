@@ -50,6 +50,22 @@ typedef struct _mqttPublish
     char message[0];
 } mqttPublish;
 
+typedef struct _mqttSubscribeHeader
+{
+    uint8_t headerFlags;
+    uint8_t msgLen;
+    uint16_t MessageIdentifier;
+    uint8_t lengthPayload[0];
+
+} mqttSubscribeHeader;
+
+typedef struct _mqttSubscribe
+{
+    uint16_t topicLength;
+    char topic[0];
+    uint8_t qos;
+} mqttSubscribe;
+
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------

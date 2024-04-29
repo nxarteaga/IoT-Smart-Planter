@@ -24,7 +24,7 @@
 #include "ip.h"
 #include "socket.h"
 
-typedef struct _tcpHeader // 20 or more bytes
+typedef struct _tcpHeader
 {
   uint16_t sourcePort;
   uint16_t destPort;
@@ -51,6 +51,7 @@ typedef struct _tcpHeader // 20 or more bytes
 #define TCP_TIME_WAIT 10
 
 // TCP offset/flags
+
 #define FIN 0x0001
 #define SYN 0x0002
 #define RST 0x0004
@@ -65,15 +66,6 @@ typedef struct _tcpHeader // 20 or more bytes
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------
-
-//Transmission Control Block
-typedef struct Tcb
-{
-     socket s;
-     uint8_t connectionState;
-     uint16_t window_Size;
-
-}TCB;
 
 void sendAck(void);
 void sendTcpFin(void);

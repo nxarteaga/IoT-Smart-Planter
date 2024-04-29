@@ -797,6 +797,10 @@ int main(void)
                         /*
                         if (isTcpPortOpen(data))
                         {
+
+                           // isSYN_ACK(data);
+                           processTcpResponse(data);
+                            // processTcpResponse
                         }
                         else
                         {
