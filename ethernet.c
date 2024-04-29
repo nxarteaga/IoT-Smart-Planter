@@ -77,8 +77,9 @@
 // Plant State Machine
 #define LUX 1
 #define TEMP 2
-#define MOIST 3
-#define VOLUME 4
+#define HUM 3
+#define MOIST 4
+#define VOLUME 5
 
 // Plant Timer
 #define PLANT_AUTO_PUB_S 10
@@ -455,7 +456,7 @@ void processShell(etherHeader *ether, socket *s)
                     if (topic != NULL)
                     {
                         // subscribeMqtt(topic);
-                        uint8_t k = 0;
+                        uint8_t placeholder = 0;
                     }
                 }
                 if (strcmp(token, "unsubscribe") == 0)
@@ -464,7 +465,7 @@ void processShell(etherHeader *ether, socket *s)
                     if (topic != NULL)
                     {
                         // unsubscribeMqtt(topic);
-                        uint8_t k = 0;
+                        uint8_t placeholder = 0;
                     }
                 }
             }
@@ -609,7 +610,7 @@ void autoPublishPlantData(etherHeader *data, socket *s)
         switch (plant_state)
         {
             case LUX:
-                snprintf(strInput, sizeof(strInput), "Lux: %"PRIu16" lx\n", volume);
+                // snprintf(strInput, sizeof(strInput), "Lux: %"PRIu16" lx\n", volume);
                 // putsUart0(strInput);
                 publishMqtt(data, s, "uta/plant/lux", convertIntToString(lux, buf));
                 plant_state = TEMP;
@@ -618,16 +619,22 @@ void autoPublishPlantData(etherHeader *data, socket *s)
                 snprintf(strInput, sizeof(strInput), "Temp: %"PRIu8" C\n", temp);
                 // putsUart0(strInput);
                 publishMqtt(data, s, "uta/plant/temp", convertIntToString(temp, buf));
+                plant_state = HUM;
+                break;
+            case HUM:
+                // snprintf(strInput, sizeof(strInput), "Hum: %"PRIu8" C\n", temp);
+                // putsUart0(strInput);
+                publishMqtt(data, s, "uta/plant/humidity", convertIntToString(hum, buf));
                 plant_state = MOIST;
                 break;
             case MOIST:
-                snprintf(strInput, sizeof(strInput), "Moisture: %"PRIu16"%%\n", moist);
+                // snprintf(strInput, sizeof(strInput), "Moisture: %"PRIu16"%%\n", moist);
                 // putsUart0(strInput);
                 publishMqtt(data, s, "uta/plant/moisture", convertIntToString(moist, buf));
                 plant_state = VOLUME;
                 break;
             case VOLUME:
-                snprintf(strInput, sizeof(strInput), "Volume: %"PRIu16" mL\n", volume);
+                // snprintf(strInput, sizeof(strInput), "Volume: %"PRIu16" mL\n", volume);
                 // putsUart0(strInput);
                 publishMqtt(data, s, "uta/plant/reservoir", convertIntToString(volume, buf));
                 plant_state = LUX;
@@ -690,7 +697,7 @@ int main(void)
     waitMicrosecond(100000);
 
     // Init plant
-    initPlant(); /**************** Comment this out, otherwise i2c errors */
+    // initPlant(); /**************** Comment this out, otherwise i2c errors */
 
     disableDhcp();
 
@@ -742,7 +749,7 @@ int main(void)
     // State
     s.state = TCP_CLOSED; // Closed on startup
 
-    setWaterPumpSpeed(512);
+    // setWaterPumpSpeed(800);
 
     // Main Loop
     // RTOS and interrupts would greatly improve this code,
@@ -750,7 +757,7 @@ int main(void)
     while (true)
     {
         // Get plant data 4 seconds
-        getPlantData(&lux, &temp, &hum, &moist, &volume);
+        // getPlantData(&lux, &temp, &hum, &moist, &volume);
 
         // Auto publishes plant data
         if (autoPublishEnabled)
