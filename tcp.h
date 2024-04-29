@@ -76,6 +76,8 @@ typedef struct Tcb
 }TCB;
 
 void sendAck(void);
+void sendTcpFin(void);
+void sendTcpArpRequest(void);
 void setTcpState(uint8_t instance, uint8_t state);
 uint8_t getTcpState(uint8_t instance);
 tcpHeader* getTcpHeaderPtr(etherHeader *ether);
@@ -84,6 +86,7 @@ void updateTcpSeqAck(etherHeader *ether, socket *s);
 bool isTcp(etherHeader *ether);
 bool isTcpSyn(etherHeader *ether);
 bool isTcpAck(etherHeader *ether);
+bool isTcpFin(etherHeader *ether);
 
 void sendTcpPendingMessages(etherHeader *ether, socket *s);
 void processDhcpResponse(etherHeader *ether);

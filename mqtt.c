@@ -72,6 +72,8 @@ void connectMqtt(etherHeader *ether, socket *s)
 
 void disconnectMqtt(etherHeader *ether, socket *s)
 {
+    mqttConnected = false;
+
     // MQTT "Header"
     uint8_t buffer[MAX_BUFF_SIZE];
     mqttHeader* mqtt = (mqttHeader*) buffer;

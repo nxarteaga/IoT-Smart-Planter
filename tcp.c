@@ -37,7 +37,7 @@ uint8_t tcpState[MAX_TCP_PORTS];
 
 bool synNeeded = false;
 bool ackNeeded = false;
-bool arpNeeded = true;
+bool arpNeeded = false;
 bool finNeeded = false;
 
 //-----------------------------------------------------------------------------
@@ -53,6 +53,16 @@ void sendAck(void)
     ackNeeded = true;
 }
 
+void sendTcpFin(void)
+{
+    finNeeded = true;
+}
+
+void sendTcpArpRequest(void)
+{
+    arpNeeded = true;
+}
+
 // Set TCP state
 void setTcpState(uint8_t instance, uint8_t state)
 {
@@ -63,6 +73,20 @@ void setTcpState(uint8_t instance, uint8_t state)
 uint8_t getTcpState(uint8_t instance)
 {
     return tcpState[instance];
+}
+
+void restartTcpStateMachine(void)
+{
+    synNeeded = false;
+    ackNeeded = false;
+    arpNeeded = false;
+    finNeeded = false;
+    setTcpState(0, TCP_CLOSED);
+}
+
+void callbackNotEstablished(void)
+{
+    restartTcpStateMachine();
 }
 
 //similar to getOptions in DHCP. Getting ptr of TCP
@@ -126,6 +150,12 @@ bool isTcpFin(etherHeader *ether)
     return ((tcp->offsetFields & htons(FIN)) == htons(FIN)) ? true : false;
 }
 
+bool isTcpRst(etherHeader *ether)
+{
+    tcpHeader *tcp = getTcpHeaderPtr(ether);
+    return ((tcp->offsetFields & htons(RST)) == htons(RST)) ? true : false;
+}
+
 // TODO: finish sendTcpPendingMessages state machine
 void sendTcpPendingMessages(etherHeader *ether, socket *s)
 {
@@ -140,6 +170,8 @@ void sendTcpPendingMessages(etherHeader *ether, socket *s)
         
         sendArpRequest(ether, localIpAddress, ipGwAddress);
         arpNeeded = false;
+
+        startOneshotTimer(callbackNotEstablished, 5);
     }
     if (synNeeded)
     {
@@ -162,6 +194,13 @@ void sendTcpPendingMessages(etherHeader *ether, socket *s)
 // TODO: finish processTcpResponse state machine
 void processTcpResponse(etherHeader *ether, socket *s)
 {
+    if (isTcpRst(ether))
+    {
+        setTcpState(0, TCP_CLOSED);
+        s->localPort += 1;
+        return;
+    }
+    
     switch (getTcpState(0))
     {
         case TCP_CLOSED:
@@ -171,8 +210,9 @@ void processTcpResponse(etherHeader *ether, socket *s)
             {
                 updateTcpSeqAck(ether, s);
 
+                stopTimer(callbackNotEstablished);
                 setTcpState(0, TCP_ESTABLISHED);
-                enableAllLEDs();
+                enableRedLED();
                 
                 ackNeeded = true;
             }
@@ -229,8 +269,9 @@ void processTcpResponse(etherHeader *ether, socket *s)
         case TCP_LAST_ACK:
             if (isTcpAck(ether))
             {
-                disableAllLEDs();
+                disableRedLED();
                 setTcpState(0, TCP_CLOSED);
+                s->localPort += 1;
             }
             break;
     }

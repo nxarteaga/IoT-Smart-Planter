@@ -78,7 +78,7 @@
 #define HX_SCK_PIN PORTE, 1     // PD Clock pin
 
 // Plant
-#define PLANT_SAMPLE_TIME_S 1   // Sample time in seconds
+#define PLANT_SAMPLE_TIME_S 8   // Sample time in seconds
 
 // Variables ------------------------------------------------------------------
 
@@ -267,7 +267,7 @@ bool readDHT22Data(dht22Data *data)
         selectPinPushPullOutput(DH_OUT_PIN);
         setPinValue(DH_OUT_PIN, 1);
 
-        startOneshotTimer(callbackDHT22, DH_WAIT_TIME_SECONDS);
+        // startOneshotTimer(callbackDHT22, DH_WAIT_TIME_SECONDS);
         DHT22ready = false;
     }
     else
@@ -486,7 +486,7 @@ uint32_t getHX711Raw(void)
 // Initializes the plant peripherals
 void initPlant(void)
 {
-    initBH1750();
+    // initBH1750();
     initDHT22();
     initSoilMoistureSensor();
     initWaterPump();
@@ -506,7 +506,7 @@ void getPlantData(uint16_t *lux, uint8_t *temp, uint8_t *hum, uint16_t *moist, u
     if (samplePlant)
     {
         // Updates plant data for each sensor
-        *lux = getBH1750Lux();
+        // *lux = getBH1750Lux();
         getDHT22TempAndHum(temp, hum);
         *moist = getSoilMoisture();
         *volume = getHX711Volume();

@@ -88,7 +88,16 @@
 // ----------------------------------------------------------------------------
 
 // Plant
+uint16_t lux = 0;
+uint8_t temp = 0, hum = 0;
+uint16_t moist = 0, volume = 0;
 bool timeToPublish = true;
+
+
+// MQTT
+bool mqttEnabled = false;
+bool mqttDisconnecting = false;
+bool mqttConnectSent = false;
 
 //-----------------------------------------------------------------------------
 // Subroutines                
@@ -277,18 +286,36 @@ uint8_t asciiToUint8(const char str[])
     return data;
 }
 
+char* convertIntToString(uint32_t num, char str[])
+{
+    uint8_t len = 0, i = 0;
+    uint64_t mod = 10;
+
+    while ((num % mod) != num)
+    {
+        mod *= 10;
+        len++;
+    }
+
+    for (i = 0; i <= len; i++)
+        str[i] = (num % mod / (mod /= 10) + 48);
+
+    str[len + 1] = NULL;
+
+    return str;
+}
+
 void processShell(etherHeader *ether, socket *s)
 {
-    bool end;
-    char c;
-    uint8_t i;
-    uint8_t ip[IP_ADD_LENGTH];
-    uint32_t* p32;
-    char *topic, *data;
 
     if (kbhitUart0())
     {
-        c = getcUart0();
+        bool end;
+        char c = getcUart0();
+        uint8_t i;
+        uint8_t ip[IP_ADD_LENGTH];
+        uint32_t* p32;
+        char *topic, *data;
 
         end = (c == 13) || (count == MAX_CHARS);
         if (!end)
@@ -332,20 +359,75 @@ void processShell(etherHeader *ether, socket *s)
                 token = strtok(NULL, " ");
                 if (strcmp(token, "connect") == 0)
                 {
-                    // connectMqtt();
+                    if (mqttEnabled)
+                    {
+                        putsUart0("MQTT already connected\n");
+                    }
+                    else
+                    {
+                        mqttEnabled = true;
+                        sendTcpArpRequest();
+                    }
                 }
                 if (strcmp(token, "disconnect") == 0)
                 {
-                    disconnectMqtt(ether, s);
+                    if (mqttEnabled)
+                    {
+                        mqttEnabled = false;
+                        mqttConnectSent = false;
+                        disconnectMqtt(ether, s);
+                    }
+                    else
+                    {
+                        putsUart0("MQTT isn't even connected yet 🤔\n");
+                    }
                 }
                 if (strcmp(token, "publish") == 0)
                 {
-                    topic = strtok(NULL, " ");
-                    data = strtok(NULL, " ");
-                    if (topic != NULL && data != NULL)
+                    if (isMqttConAcked())
                     {
-                        // publishMqtt(topic, data);
-                        uint8_t k = 0;
+                        topic = strtok(NULL, " ");
+
+                        if ((strcmp(topic, "lux") == 0) || strcmp(topic, "uta/plant/lux") == 0)
+                        {
+                            convertIntToString(lux, data);
+                            topic = "uta/plant/lux";
+                        }
+                        else if ((strcmp(topic, "temp") == 0) || strcmp(topic, "uta/plant/temp") == 0)
+                        {
+                            convertIntToString(temp, data);
+                            topic = "uta/plant/temp";
+                        }
+                        else if ((strcmp(topic, "humidity") == 0) || strcmp(topic, "uta/plant/humidity") == 0)
+                        {
+                            convertIntToString(hum, data);
+                            topic = "uta/plant/temp";
+                        }
+                        else if ((strcmp(topic, "moisture") == 0) || strcmp(topic, "uta/plant/moisture") == 0)
+                        {
+                            convertIntToString(moist, data);
+                            topic = "uta/plant/moisture";
+                        }
+                        else if ((strcmp(topic, "reservoir") == 0) || strcmp(topic, "uta/plant/reservoir") == 0)
+                        {
+                            convertIntToString(volume, data);
+                            topic = "uta/plant/reservoir";
+                        }
+                        else
+                        {
+                            topic = NULL;
+                            data = NULL;
+                            putsUart0("Invalid topic\n");
+                        }
+
+                        if (topic != NULL && data != NULL)
+                        {
+                            publishMqtt(ether, s, topic, data);
+                        }
+                    }
+                    else
+                    {
+                        putsUart0("MQTT not connected yet\n");
                     }
                 }
                 if (strcmp(token, "subscribe") == 0)
@@ -471,25 +553,6 @@ void processShell(etherHeader *ether, socket *s)
     }
 }
 
-char* convertIntToString(uint32_t num, char str[])
-{
-    uint8_t len = 0, i = 0;
-    uint64_t mod = 10;
-
-    while ((num % mod) != num)
-    {
-        mod *= 10;
-        len++;
-    }
-
-    for (i = 0; i <= len; i++)
-        str[i] = (num % mod / (mod /= 10) + 48);
-
-    str[len + 1] = NULL;
-
-    return str;
-}
-
 void callbackPublishPlantData()
 {
     timeToPublish = true;
@@ -551,6 +614,13 @@ int main(void)
     etherHeader *data = (etherHeader*) buffer;
     socket s;
 
+    // Clears buffer from last reboot
+    uint16_t i = 0;
+    for (i = 0; i < MAX_PACKET_SIZE; i++)
+    {
+        buffer[i] = 0;
+    }
+
     // Init controller
     initHw();
 
@@ -604,8 +674,8 @@ int main(void)
     tempGw[1] = 168;
     tempGw[2] = 1;
     // tempGw[3] = 236; // Lab PC
-    tempGw[3] = 115; // Broker Team
-    // tempGw[3] = 163; // Laptop
+    // tempGw[3] = 115; // Broker Team
+    tempGw[3] = 163; // Laptop
 
     setIpAddress(tempLocalIpAddress);
     setIpSubnetMask(tempSn);
@@ -622,7 +692,7 @@ int main(void)
     s.remoteIpAddress[3] = tempGw[3];
 
     // Ports
-    s.remotePort = 1883; // MQTT Port
+    s.remotePort = 1883; // Unencrypted MQTT Port
     s.localPort = 50141; // Gets random port, start at 50000 for testing
 
     // SEQ/ACK Nums
@@ -632,12 +702,6 @@ int main(void)
     // State
     s.state = TCP_CLOSED; // Closed on startup
 
-    bool mqttConnectSent = false;
-
-    uint16_t lux = 0;
-    uint8_t temp = 0, hum = 0;
-    uint16_t moist = 0, volume = 0;
-
     setWaterPumpSpeed(512);
 
     // Main Loop
@@ -645,34 +709,28 @@ int main(void)
     // but the goal here is simplicity
     while (true)
     {
-        // Get plant data every second
+        // Get plant data 8 seconds
         getPlantData(&lux, &temp, &hum, &moist, &volume);
 
         // Put terminal processing here
         processShell(data, &s);
-
+        
+        /*
         // DHCP maintenance
         if (isDhcpEnabled())
         {
             sendDhcpPendingMessages(data);
         }
+        */
 
         // TCP pending messages
         sendTcpPendingMessages(data, &s);
 
-        // MQTT Publish Test
-        if (getTcpState(0) == TCP_ESTABLISHED)
+        // Sends MQTT Connect message if not sent
+        if (!mqttConnectSent && (getTcpState(0) == TCP_ESTABLISHED) && mqttEnabled)
         {
-            if (!mqttConnectSent)
-            {
-                connectMqtt(data, &s);
-                mqttConnectSent = true;
-            }
-
-            if (isMqttConAcked())
-            {
-                publishPlantData(data, &s, lux, temp, hum, moist, volume);
-            }
+            connectMqtt(data, &s);
+            mqttConnectSent = true;
         }
 
         // Packet processings
@@ -680,25 +738,29 @@ int main(void)
         {
             if (isEtherOverflow())
             {
+                /*
                 setPinValue(RED_LED, 1);
                 waitMicrosecond(100000);
                 setPinValue(RED_LED, 0);
+                */
             }
 
             // Get packet
             getEtherPacket(data, MAX_PACKET_SIZE);
-
-            // Handle ARP request
-            if (isArpRequest(data))
-                sendArpResponse(data);
 
             // Route ARP response to appropriate handlers
             // DHCP uses ARP response to verify address granted is not in use
             // TCP active open uses ARP response to get the HW address to establish the socket
             if (isArpResponse(data))
             {
-                processDhcpArpResponse(data);
+                // processDhcpArpResponse(data);
                 processTcpArpResponse(data, &s);
+            }
+
+            // Handle ARP request
+            if (isArpRequest(data))
+            {
+                sendArpResponse(data);
             }
 
             // Handle IP datagram
@@ -717,9 +779,13 @@ int main(void)
                     {
                         udpData = getUdpData(data);
                         if (strcmp((char*)udpData, "on") == 0)
+                        {
                             setPinValue(GREEN_LED, 1);
+                        }
                         if (strcmp((char*)udpData, "off") == 0)
+                        {
                             setPinValue(GREEN_LED, 0);
+                        }
                         getSocketInfoFromUdpPacket(data, &s);
                         sendUdpMessage(data, s, (uint8_t*)"Received", 9);
                     }
@@ -727,27 +793,45 @@ int main(void)
                     // Handle TCP datagram
                     if (isTcp(data))
                     {
+                        processTcpResponse(data, &s);
+                        /*
+                        if (isTcpPortOpen(data))
+                        {
+                        }
+                        else
+                        {
+                            sendTcpResponse(data, &s, ACK | RST);
+                        }
+                        */
+
                         // MQTT Connect Ack handler
                         if (mqttConnectSent && !isMqttConAcked())
                         {
                             checkMqttConAck(data, &s);
                         }
 
-                        processTcpResponse(data, &s);
-                        if (isTcpPortOpen(data))
+                        // MQTT Disconnect Fin handler
+                        if (mqttDisconnecting)
                         {
+                            if (!isTcpFin(data))
+                            {
+                                sendTcpFin();
+                            }
+                            mqttDisconnecting = false;
                         }
-                        else
-                            sendTcpResponse(data, &s, ACK | RST);
                     }
                 }
+                /*
             	// Handle DHCP response
                 else
                 {
                     if (isUdp(data))
                         if (isDhcpResponse(data))
+                        {   
                             processDhcpResponse(data);
+                        }
                 }
+                */
             }
         }
     }
