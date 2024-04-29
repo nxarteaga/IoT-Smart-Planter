@@ -78,7 +78,7 @@
 #define HX_SCK_PIN PORTE, 1     // PD Clock pin
 
 // Plant
-#define PLANT_SAMPLE_TIME_S 8   // Sample time in seconds
+#define PLANT_SAMPLE_TIME_S 4   // Sample time in seconds
 
 // Variables ------------------------------------------------------------------
 
@@ -91,7 +91,7 @@ const uint16_t moistureMax = 2800;  // Maximum value from the ADC (Air)
 
 // HX711 Weight Sensor
 const uint32_t hx711Base = 327000;  // Minimum value from HX711
-const uint16_t hx711Scaler = 428;   // Raw ADC to volume scale (div) value
+const uint16_t hx711Scaler = 420;   // Raw ADC to volume scale (div) value lol
 
 // Plant
 bool samplePlant = true;    // Flag indicating plant can be sampled
@@ -467,7 +467,6 @@ uint16_t getHX711Volume(void)
     // Gets data from HX711 and calculates the current volume
     uint32_t raw = readHX711Data();
     uint16_t volume = ((raw - hx711Base) / hx711Scaler);
-    // volume = volume / hx711Scaler;
 
     return volume;
 }
@@ -486,7 +485,7 @@ uint32_t getHX711Raw(void)
 // Initializes the plant peripherals
 void initPlant(void)
 {
-    // initBH1750();
+    initBH1750();
     initDHT22();
     initSoilMoistureSensor();
     initWaterPump();
@@ -506,7 +505,7 @@ void getPlantData(uint16_t *lux, uint8_t *temp, uint8_t *hum, uint16_t *moist, u
     if (samplePlant)
     {
         // Updates plant data for each sensor
-        // *lux = getBH1750Lux();
+        *lux = getBH1750Lux();
         getDHT22TempAndHum(temp, hum);
         *moist = getSoilMoisture();
         *volume = getHX711Volume();

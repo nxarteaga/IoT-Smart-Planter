@@ -81,7 +81,7 @@
 #define VOLUME 4
 
 // Plant Timer
-#define PLANT_WAIT_TIME 30
+#define PLANT_AUTO_PUB_S 10
 
 // ----------------------------------------------------------------------------
 // Globals
@@ -98,6 +98,7 @@ bool timeToPublish = true;
 bool mqttEnabled = false;
 bool mqttDisconnecting = false;
 bool mqttConnectSent = false;
+bool autoPublishEnabled = false;
 
 //-----------------------------------------------------------------------------
 // Subroutines                
@@ -305,6 +306,23 @@ char* convertIntToString(uint32_t num, char str[])
     return str;
 }
 
+int32_t getFieldInteger(char str[], uint8_t fieldNumber)
+{
+    int8_t len = 0, i = 0;
+    uint32_t num = 0, tens = 1;
+    while (*str != NULL)
+    {
+        len++;
+        str++;
+    }
+    for (i = len - 1; i >= 0; i--)
+    {
+        num += (str[i] - 48) * tens;
+        tens = tens * 10;
+    }
+    return num;
+}
+
 void processShell(etherHeader *ether, socket *s)
 {
 
@@ -375,6 +393,7 @@ void processShell(etherHeader *ether, socket *s)
                     {
                         mqttEnabled = false;
                         mqttConnectSent = false;
+                        autoPublishEnabled = false;
                         disconnectMqtt(ether, s);
                     }
                     else
@@ -452,6 +471,26 @@ void processShell(etherHeader *ether, socket *s)
             if (strcmp(token, "ip") == 0)
             {
                 displayConnectionInfo();
+            }
+            if (strcmp(token, "autopub") == 0)
+            {
+                if (isMqttConAcked())
+                {
+                    if (!autoPublishEnabled)
+                    {
+                        autoPublishEnabled = true;
+                        putsUart0("Auto publish enabled\n");
+                    }
+                    else
+                    {
+                        autoPublishEnabled = false;
+                        putsUart0("Auto publish disabled\n");
+                    }
+                }
+                else
+                {
+                    putsUart0("MQTT not connected yet\n");
+                }
             }
             if (strcmp(token, "ping") == 0)
             {
@@ -544,6 +583,7 @@ void processShell(etherHeader *ether, socket *s)
                 putsUart0("  mqtt ACTION [USER [PASSWORD]]\n");
                 putsUart0("    where ACTION = {connect|disconnect|publish TOPIC DATA\n");
                 putsUart0("                   |subscribe TOPIC|unsubscribe TOPIC}\n");
+                putsUart0("  autopub\n");
                 putsUart0("  ip\n");
                 putsUart0("  ping w.x.y.z\n");
                 putsUart0("  reboot\n");
@@ -559,7 +599,7 @@ void callbackPublishPlantData()
     KillTimer(callbackPublishPlantData);
 }
 
-void publishPlantData(etherHeader *data, socket *s, uint16_t lux, uint8_t temp, uint8_t hum, uint16_t moist, uint16_t volume)
+void autoPublishPlantData(etherHeader *data, socket *s)
 {
     static uint8_t plant_state = LUX;
 
@@ -595,7 +635,7 @@ void publishPlantData(etherHeader *data, socket *s, uint16_t lux, uint8_t temp, 
         }
 
         timeToPublish = false;
-        startOneshotTimer(callbackPublishPlantData, PLANT_WAIT_TIME);
+        startOneshotTimer(callbackPublishPlantData, PLANT_AUTO_PUB_S);
     }
 }
 
@@ -634,9 +674,6 @@ int main(void)
     // Init sockets
     initSockets();
 
-    // Init plant
-    initPlant(); /**************** Comment this out, otherwise i2c errors */
-
     // Init ethernet interface (eth0)
     putsUart0("\nStarting eth0\n");
     initEther(ETHER_UNICAST | ETHER_BROADCAST | ETHER_HALFDUPLEX);
@@ -651,6 +688,9 @@ int main(void)
     waitMicrosecond(100000);
     setPinValue(GREEN_LED, 0);
     waitMicrosecond(100000);
+
+    // Init plant
+    initPlant(); /**************** Comment this out, otherwise i2c errors */
 
     disableDhcp();
 
@@ -674,8 +714,8 @@ int main(void)
     tempGw[1] = 168;
     tempGw[2] = 1;
     // tempGw[3] = 236; // Lab PC
-    // tempGw[3] = 115; // Broker Team
-    tempGw[3] = 163; // Laptop
+    tempGw[3] = 115; // Broker Team
+    // tempGw[3] = 163; // Laptop
 
     setIpAddress(tempLocalIpAddress);
     setIpSubnetMask(tempSn);
@@ -709,8 +749,14 @@ int main(void)
     // but the goal here is simplicity
     while (true)
     {
-        // Get plant data 8 seconds
+        // Get plant data 4 seconds
         getPlantData(&lux, &temp, &hum, &moist, &volume);
+
+        // Auto publishes plant data
+        if (autoPublishEnabled)
+        {
+            autoPublishPlantData(data, &s);
+        }
 
         // Put terminal processing here
         processShell(data, &s);
@@ -761,6 +807,11 @@ int main(void)
             if (isArpRequest(data))
             {
                 sendArpResponse(data);
+            }
+
+            if (getTcpState(0) == TCP_CLOSED)
+            {
+                waitMicrosecond(1000);
             }
 
             // Handle IP datagram
