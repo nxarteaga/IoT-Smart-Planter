@@ -81,7 +81,7 @@
 #define VOLUME 4
 
 // Plant Timer
-#define PLANT_WAIT_TIME 5
+#define PLANT_WAIT_TIME 30
 
 // ----------------------------------------------------------------------------
 // Globals
@@ -277,7 +277,7 @@ uint8_t asciiToUint8(const char str[])
     return data;
 }
 
-void processShell()
+void processShell(etherHeader *ether, socket *s)
 {
     bool end;
     char c;
@@ -336,7 +336,7 @@ void processShell()
                 }
                 if (strcmp(token, "disconnect") == 0)
                 {
-                    // disconnectMqtt();
+                    disconnectMqtt(ether, s);
                 }
                 if (strcmp(token, "publish") == 0)
                 {
@@ -485,7 +485,7 @@ char* convertIntToString(uint32_t num, char str[])
     for (i = 0; i <= len; i++)
         str[i] = (num % mod / (mod /= 10) + 48);
 
-    str[len + 1] = 0;
+    str[len + 1] = NULL;
 
     return str;
 }
@@ -502,30 +502,30 @@ void publishPlantData(etherHeader *data, socket *s, uint16_t lux, uint8_t temp, 
 
     if (timeToPublish)
     {
+        char buf[4] = {0, 0, 0, 0};
         switch (plant_state)
         {
-            char buf[4] = {0, 0, 0, 0};
             case LUX:
                 snprintf(strInput, sizeof(strInput), "Lux: %"PRIu16" lx\n", volume);
-                putsUart0(strInput);
+                // putsUart0(strInput);
                 publishMqtt(data, s, "uta/plant/lux", convertIntToString(lux, buf));
                 plant_state = TEMP;
                 break;
             case TEMP:
                 snprintf(strInput, sizeof(strInput), "Temp: %"PRIu8" C\n", temp);
-                putsUart0(strInput);
+                // putsUart0(strInput);
                 publishMqtt(data, s, "uta/plant/temp", convertIntToString(temp, buf));
                 plant_state = MOIST;
                 break;
             case MOIST:
                 snprintf(strInput, sizeof(strInput), "Moisture: %"PRIu16"%%\n", moist);
-                putsUart0(strInput);
+                // putsUart0(strInput);
                 publishMqtt(data, s, "uta/plant/moisture", convertIntToString(moist, buf));
                 plant_state = VOLUME;
                 break;
             case VOLUME:
                 snprintf(strInput, sizeof(strInput), "Volume: %"PRIu16" mL\n", volume);
-                putsUart0(strInput);
+                // putsUart0(strInput);
                 publishMqtt(data, s, "uta/plant/reservoir", convertIntToString(volume, buf));
                 plant_state = LUX;
                 break;
@@ -603,8 +603,9 @@ int main(void)
     tempGw[0] = 192;
     tempGw[1] = 168;
     tempGw[2] = 1;
-    // tempGw[3] = 236; // Lab
-    tempGw[3] = 163; // Home
+    // tempGw[3] = 236; // Lab PC
+    tempGw[3] = 115; // Broker Team
+    // tempGw[3] = 163; // Laptop
 
     setIpAddress(tempLocalIpAddress);
     setIpSubnetMask(tempSn);
@@ -622,7 +623,7 @@ int main(void)
 
     // Ports
     s.remotePort = 1883; // MQTT Port
-    s.localPort = 50133; // Gets random port, start at 50000 for testing
+    s.localPort = 50141; // Gets random port, start at 50000 for testing
 
     // SEQ/ACK Nums
     s.sequenceNumber = htonl(2); // Starts at 1
@@ -631,7 +632,7 @@ int main(void)
     // State
     s.state = TCP_CLOSED; // Closed on startup
 
-    bool mqttConnected = false;
+    bool mqttConnectSent = false;
 
     uint16_t lux = 0;
     uint8_t temp = 0, hum = 0;
@@ -648,7 +649,7 @@ int main(void)
         getPlantData(&lux, &temp, &hum, &moist, &volume);
 
         // Put terminal processing here
-        processShell();
+        processShell(data, &s);
 
         // DHCP maintenance
         if (isDhcpEnabled())
@@ -659,17 +660,18 @@ int main(void)
         // TCP pending messages
         sendTcpPendingMessages(data, &s);
 
-        // Automatically sends plant data to MQTT broker
+        // MQTT Publish Test
         if (getTcpState(0) == TCP_ESTABLISHED)
         {
-            if (mqttConnected)
-            {
-                publishPlantData(data, &s, lux, temp, hum, moist, volume);
-            }
-            else
+            if (!mqttConnectSent)
             {
                 connectMqtt(data, &s);
-                mqttConnected = true;
+                mqttConnectSent = true;
+            }
+
+            if (isMqttConAcked())
+            {
+                publishPlantData(data, &s, lux, temp, hum, moist, volume);
             }
         }
 
@@ -725,8 +727,13 @@ int main(void)
                     // Handle TCP datagram
                     if (isTcp(data))
                     {
+                        // MQTT Connect Ack handler
+                        if (mqttConnectSent && !isMqttConAcked())
+                        {
+                            checkMqttConAck(data, &s);
+                        }
+
                         processTcpResponse(data, &s);
-                        // processTcpResponse(data, &s);
                         if (isTcpPortOpen(data))
                         {
                         }

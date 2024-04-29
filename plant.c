@@ -23,8 +23,8 @@
  *  - White -> A-
  *  - Green -> A+
  * HX711 to TM4C:
- *  - DT -> PE1
- *  - SCK -> PE2
+ *  - DT -> PE2
+ *  - SCK -> PE1
 */
 
 // Libraries ------------------------------------------------------------------
@@ -74,8 +74,8 @@
 
 
 // HX711 Weight Sensor
-#define HX_DOUT_PIN PORTE, 1    // Data output pin
-#define HX_SCK_PIN PORTE, 2     // PD Clock pin
+#define HX_DOUT_PIN PORTE, 2    // Data output pin
+#define HX_SCK_PIN PORTE, 1     // PD Clock pin
 
 // Plant
 #define PLANT_SAMPLE_TIME_S 1   // Sample time in seconds

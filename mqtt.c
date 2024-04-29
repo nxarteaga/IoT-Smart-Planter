@@ -31,6 +31,8 @@
 //  Globals
 // ------------------------------------------------------------------------------
 
+bool mqttConnected = false;
+
 // ------------------------------------------------------------------------------
 //  Structures
 // ------------------------------------------------------------------------------
@@ -102,7 +104,7 @@ void publishMqtt(etherHeader *ether, socket *s, char strTopic[], char strData[])
     payloadPtr = payload->topic; // Point to the start of topic in payload
 
     // Topic name loop
-    while (*strPtr)
+    while (*strPtr != NULL)
     {
         payloadSize++;          // Increment the payload size
         *payloadPtr = *strPtr;  // Copy the topic name
@@ -115,10 +117,10 @@ void publishMqtt(etherHeader *ether, socket *s, char strTopic[], char strData[])
     payload->topicLength = htons(payloadSize); // Set the topic length
 
     strPtr = strData;  // Point to the start of message to be copied
-    payloadPtr += 1; // Point to the start of message in payload
+    // payloadPtr += 1; // Point to the start of message in payload
 
     // Message loop
-    while (*strPtr)
+    while (*strPtr != NULL)
     {
         payloadSize++;          // Increment the payload size
         *payloadPtr = *strPtr;  // Copy the message
@@ -127,7 +129,7 @@ void publishMqtt(etherHeader *ether, socket *s, char strTopic[], char strData[])
         payloadPtr++;
         strPtr++;
     }
-    payloadSize += 1;
+    // payloadSize += 1;
 
     // adjust lengths
     mqtt->msgLen = sizeof(mqttPublish) + payloadSize;
@@ -145,4 +147,27 @@ void subscribeMqtt(etherHeader *ether, socket *s, char strTopic[])
 void unsubscribeMqtt(etherHeader *ether, socket *s, char strTopic[])
 {
 
+}
+
+void checkMqttConAck(etherHeader *ether, socket *s)
+{
+    tcpHeader* tcp = getTcpHeaderPtr(ether);
+    uint8_t headerFlags = tcp->data[0];
+
+    if (headerFlags == 0x20)
+    {
+        // updateTcpSeqAck(ether, s);
+        s->acknowledgementNumber += 4;
+        sendAck();
+        mqttConnected = true;
+    }
+    else
+    {
+        mqttConnected = false;
+    }
+}
+
+bool isMqttConAcked()
+{
+    return mqttConnected;
 }

@@ -59,6 +59,8 @@ void disconnectMqtt(etherHeader *ether, socket *s);
 void publishMqtt(etherHeader *ether, socket *s, char strTopic[], char strData[]);
 void subscribeMqtt(etherHeader *ether, socket *s, char strTopic[]);
 void unsubscribeMqtt(etherHeader *ether, socket *s, char strTopic[]);
+void checkMqttConAck(etherHeader *ether, socket *s);
+bool isMqttConAcked(void);
 
 #endif
 

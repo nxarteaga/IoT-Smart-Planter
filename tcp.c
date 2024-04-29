@@ -48,6 +48,11 @@ bool finNeeded = false;
 // Subroutines
 //-----------------------------------------------------------------------------
 
+void sendAck(void)
+{
+    ackNeeded = true;
+}
+
 // Set TCP state
 void setTcpState(uint8_t instance, uint8_t state)
 {
