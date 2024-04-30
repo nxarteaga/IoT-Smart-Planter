@@ -433,6 +433,11 @@ void processShell(etherHeader *ether, socket *s)
                             convertIntToString(volume, data);
                             topic = "uta/plant/reservoir";
                         }
+                        else if ((strcmp(topic, "setpoint") == 0) || strcmp(topic, "uta/plant/moisture_set_point") == 0)
+                        {
+                            data = strktok(NULL, " ");
+                            topic = "uta/plant/moisture_set_point";
+                        }
                         else
                         {
                             topic = NULL;
@@ -697,7 +702,7 @@ int main(void)
     waitMicrosecond(100000);
 
     // Init plant
-    // initPlant(); /**************** Comment this out, otherwise i2c errors */
+    initPlant(); /**************** Comment this out, otherwise i2c errors */
 
     disableDhcp();
 
@@ -757,7 +762,13 @@ int main(void)
     while (true)
     {
         // Get plant data 4 seconds
-        // getPlantData(&lux, &temp, &hum, &moist, &volume);
+        getPlantData(&lux, &temp, &hum, &moist, &volume);
+
+        // Moisture Setpoint Pseudocode
+        // if (moisture > moisture_set_point)
+        // {
+        //      pumpwater()
+        // }
 
         // Auto publishes plant data
         if (autoPublishEnabled)
