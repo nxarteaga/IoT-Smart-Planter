@@ -77,11 +77,12 @@
 // Plant State Machine
 #define LUX 1
 #define TEMP 2
-#define MOIST 3
-#define VOLUME 4
+#define HUM 3
+#define MOIST 4
+#define VOLUME 5
 
 // Plant Timer
-#define PLANT_WAIT_TIME 30
+#define PLANT_AUTO_PUB_S 10
 
 // ----------------------------------------------------------------------------
 // Globals
@@ -101,6 +102,7 @@ bool mqttConnectSent = false;
 bool mqttSubAckNeeded = false;
 bool mqttSubbed = false;
 char subbedTopicDataStr[3] = {0, 0, NULL};
+bool autoPublishEnabled = false;
 
 //-----------------------------------------------------------------------------
 // Subroutines                
@@ -312,14 +314,16 @@ int32_t convertStringToInt(char str[])
 {
     int8_t len = 0, i = 0;
     uint32_t num = 0, tens = 1;
-
+  
     while (*str != NULL)
     {
         len++;
         str++;
     }
+  
     str -= len;
     tens = 10 * (len - 1);
+  
     for (i = 0; i < len; i++)
     {
         num += (str[i] - 48) * tens;
@@ -399,6 +403,7 @@ void processShell(etherHeader *ether, socket *s)
                         mqttEnabled = false;
                         mqttConnectSent = false;
                         mqttSubAckNeeded = false;
+                        autoPublishEnabled = false;
                         disconnectMqtt(ether, s);
                     }
                     else
@@ -436,6 +441,11 @@ void processShell(etherHeader *ether, socket *s)
                         {
                             convertIntToString(volume, data);
                             topic = "uta/plant/reservoir";
+                        }
+                        else if ((strcmp(topic, "setpoint") == 0) || strcmp(topic, "uta/plant/moisture_set_point") == 0)
+                        {
+                            data = strktok(NULL, " ");
+                            topic = "uta/plant/moisture_set_point";
                         }
                         else
                         {
@@ -481,13 +491,33 @@ void processShell(etherHeader *ether, socket *s)
                     {
                         mqttSubAckNeeded = false;
                         // unsubscribeMqtt(topic);
-                        uint8_t k = 0;
+                        uint8_t placeholder = 0;
                     }
                 }
             }
             if (strcmp(token, "ip") == 0)
             {
                 displayConnectionInfo();
+            }
+            if (strcmp(token, "autopub") == 0)
+            {
+                if (isMqttConAcked())
+                {
+                    if (!autoPublishEnabled)
+                    {
+                        autoPublishEnabled = true;
+                        putsUart0("Auto publish enabled\n");
+                    }
+                    else
+                    {
+                        autoPublishEnabled = false;
+                        putsUart0("Auto publish disabled\n");
+                    }
+                }
+                else
+                {
+                    putsUart0("MQTT not connected yet\n");
+                }
             }
             if (strcmp(token, "ping") == 0)
             {
@@ -580,6 +610,7 @@ void processShell(etherHeader *ether, socket *s)
                 putsUart0("  mqtt ACTION [USER [PASSWORD]]\n");
                 putsUart0("    where ACTION = {connect|disconnect|publish TOPIC DATA\n");
                 putsUart0("                   |subscribe TOPIC|unsubscribe TOPIC}\n");
+                putsUart0("  autopub\n");
                 putsUart0("  ip\n");
                 putsUart0("  ping w.x.y.z\n");
                 putsUart0("  reboot\n");
@@ -595,7 +626,7 @@ void callbackPublishPlantData()
     KillTimer(callbackPublishPlantData);
 }
 
-void publishPlantData(etherHeader *data, socket *s, uint16_t lux, uint8_t temp, uint8_t hum, uint16_t moist, uint16_t volume)
+void autoPublishPlantData(etherHeader *data, socket *s)
 {
     static uint8_t plant_state = LUX;
 
@@ -605,7 +636,7 @@ void publishPlantData(etherHeader *data, socket *s, uint16_t lux, uint8_t temp, 
         switch (plant_state)
         {
             case LUX:
-                snprintf(strInput, sizeof(strInput), "Lux: %"PRIu16" lx\n", volume);
+                // snprintf(strInput, sizeof(strInput), "Lux: %"PRIu16" lx\n", volume);
                 // putsUart0(strInput);
                 publishMqtt(data, s, "uta/plant/lux", convertIntToString(lux, buf));
                 plant_state = TEMP;
@@ -614,16 +645,22 @@ void publishPlantData(etherHeader *data, socket *s, uint16_t lux, uint8_t temp, 
                 snprintf(strInput, sizeof(strInput), "Temp: %"PRIu8" C\n", temp);
                 // putsUart0(strInput);
                 publishMqtt(data, s, "uta/plant/temp", convertIntToString(temp, buf));
+                plant_state = HUM;
+                break;
+            case HUM:
+                // snprintf(strInput, sizeof(strInput), "Hum: %"PRIu8" C\n", temp);
+                // putsUart0(strInput);
+                publishMqtt(data, s, "uta/plant/humidity", convertIntToString(hum, buf));
                 plant_state = MOIST;
                 break;
             case MOIST:
-                snprintf(strInput, sizeof(strInput), "Moisture: %"PRIu16"%%\n", moist);
+                // snprintf(strInput, sizeof(strInput), "Moisture: %"PRIu16"%%\n", moist);
                 // putsUart0(strInput);
                 publishMqtt(data, s, "uta/plant/moisture", convertIntToString(moist, buf));
                 plant_state = VOLUME;
                 break;
             case VOLUME:
-                snprintf(strInput, sizeof(strInput), "Volume: %"PRIu16" mL\n", volume);
+                // snprintf(strInput, sizeof(strInput), "Volume: %"PRIu16" mL\n", volume);
                 // putsUart0(strInput);
                 publishMqtt(data, s, "uta/plant/reservoir", convertIntToString(volume, buf));
                 plant_state = LUX;
@@ -631,7 +668,7 @@ void publishPlantData(etherHeader *data, socket *s, uint16_t lux, uint8_t temp, 
         }
 
         timeToPublish = false;
-        startOneshotTimer(callbackPublishPlantData, PLANT_WAIT_TIME);
+        startOneshotTimer(callbackPublishPlantData, PLANT_AUTO_PUB_S);
     }
 }
 
@@ -670,9 +707,6 @@ int main(void)
     // Init sockets
     initSockets();
 
-    // Init plant
-    // initPlant(); /**************** Comment this out, otherwise i2c errors */
-
     // Init ethernet interface (eth0)
     putsUart0("\nStarting eth0\n");
     initEther(ETHER_UNICAST | ETHER_BROADCAST | ETHER_HALFDUPLEX);
@@ -687,6 +721,9 @@ int main(void)
     waitMicrosecond(100000);
     setPinValue(GREEN_LED, 0);
     waitMicrosecond(100000);
+
+    // Init plant
+    initPlant(); /**************** Comment this out, otherwise i2c errors */
 
     disableDhcp();
 
@@ -710,8 +747,8 @@ int main(void)
     tempGw[1] = 168;
     tempGw[2] = 1;
     // tempGw[3] = 236; // Lab PC
-    // tempGw[3] = 115; // Broker Team
-    tempGw[3] = 115; // Laptop
+    tempGw[3] = 115; // Broker Team
+    // tempGw[3] = 163; // Laptop
 
     setIpAddress(tempLocalIpAddress);
     setIpSubnetMask(tempSn);
@@ -738,18 +775,27 @@ int main(void)
     // State
     s.state = TCP_CLOSED; // Closed on startup
 
-    //setWaterPumpSpeed(512);
+    // setWaterPumpSpeed(800);
 
     // Main Loop
     // RTOS and interrupts would greatly improve this code,
     // but the goal here is simplicity
     while (true)
     {
-        // Get plant data 8 seconds
-        // getPlantData(&lux, &temp, &hum, &moist, &volume);
+        // Get plant data 4 seconds
+        getPlantData(&lux, &temp, &hum, &moist, &volume);
 
-        // if (moist > moistersetpoint)
-        // pump water
+        // Moisture Setpoint Pseudocode
+        // if (moisture > moisture_set_point)
+        // {
+        //      pumpwater()
+        // }
+
+        // Auto publishes plant data
+        if (autoPublishEnabled)
+        {
+            autoPublishPlantData(data, &s);
+        }
 
         // Put terminal processing here
         processShell(data, &s);
@@ -800,6 +846,11 @@ int main(void)
             if (isArpRequest(data))
             {
                 sendArpResponse(data);
+            }
+
+            if (getTcpState(0) == TCP_CLOSED)
+            {
+                waitMicrosecond(1000);
             }
 
             // Handle IP datagram
