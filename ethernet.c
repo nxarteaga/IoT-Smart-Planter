@@ -430,7 +430,7 @@ void processShell(etherHeader *ether, socket *s)
                         else if ((strcmp(topic, "humidity") == 0) || strcmp(topic, "uta/plant/humidity") == 0)
                         {
                             convertIntToString(hum, data);
-                            topic = "uta/plant/temp";
+                            topic = "uta/plant/humidity";
                         }
                         else if ((strcmp(topic, "moisture") == 0) || strcmp(topic, "uta/plant/moisture") == 0)
                         {
