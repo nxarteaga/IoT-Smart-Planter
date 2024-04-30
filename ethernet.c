@@ -91,13 +91,16 @@
 uint16_t lux = 0;
 uint8_t temp = 0, hum = 0;
 uint16_t moist = 0, volume = 0;
+uint8_t subbedTopicData = 0;
 bool timeToPublish = true;
-
 
 // MQTT
 bool mqttEnabled = false;
 bool mqttDisconnecting = false;
 bool mqttConnectSent = false;
+bool mqttSubAckNeeded = false;
+bool mqttSubbed = false;
+char subbedTopicDataStr[3] = {0, 0, NULL};
 
 //-----------------------------------------------------------------------------
 // Subroutines                
@@ -305,6 +308,26 @@ char* convertIntToString(uint32_t num, char str[])
     return str;
 }
 
+int32_t convertStringToInt(char str[])
+{
+    int8_t len = 0, i = 0;
+    uint32_t num = 0, tens = 1;
+
+    while (*str != NULL)
+    {
+        len++;
+        str++;
+    }
+    str -= len;
+    tens = 10 * (len - 1);
+    for (i = 0; i < len; i++)
+    {
+        num += (str[i] - 48) * tens;
+        tens = tens / 10;
+    }
+    return num;
+}
+
 void processShell(etherHeader *ether, socket *s)
 {
 
@@ -375,6 +398,7 @@ void processShell(etherHeader *ether, socket *s)
                     {
                         mqttEnabled = false;
                         mqttConnectSent = false;
+                        mqttSubAckNeeded = false;
                         disconnectMqtt(ether, s);
                     }
                     else
@@ -435,7 +459,18 @@ void processShell(etherHeader *ether, socket *s)
                     topic = strtok(NULL, " ");
                     if (topic != NULL)
                     {
-                        // subscribeMqtt(topic);
+                        char *topicPtr = topic;
+                        uint16_t topicLen = 0;
+
+                        while (*topicPtr != NULL)
+                        {
+                            topicPtr++;
+                            topicLen++;
+                        }
+
+                        setSubbedTopicLengh(topicLen);
+                        mqttSubAckNeeded = true;
+                        subscribeMqtt(ether, s, topic);
                         uint8_t k = 0;
                     }
                 }
@@ -444,6 +479,7 @@ void processShell(etherHeader *ether, socket *s)
                     topic = strtok(NULL, " ");
                     if (topic != NULL)
                     {
+                        mqttSubAckNeeded = false;
                         // unsubscribeMqtt(topic);
                         uint8_t k = 0;
                     }
@@ -635,12 +671,12 @@ int main(void)
     initSockets();
 
     // Init plant
-    initPlant(); /**************** Comment this out, otherwise i2c errors */
+    // initPlant(); /**************** Comment this out, otherwise i2c errors */
 
     // Init ethernet interface (eth0)
     putsUart0("\nStarting eth0\n");
     initEther(ETHER_UNICAST | ETHER_BROADCAST | ETHER_HALFDUPLEX);
-    setEtherMacAddress(2, 3, 4, 5, 6, 0x79);
+    setEtherMacAddress(2, 3, 4, 5, 6, 0x66);
 
     // Init EEPROM
     // FIXME: EEPROM is seemingly not storing values between resets?
@@ -663,7 +699,7 @@ int main(void)
     tempLocalIpAddress[0] = 192;
     tempLocalIpAddress[1] = 168;
     tempLocalIpAddress[2] = 1;
-    tempLocalIpAddress[3] = 121;
+    tempLocalIpAddress[3] = 102;
 
     tempSn[0] = 255;
     tempSn[1] = 255;
@@ -675,7 +711,7 @@ int main(void)
     tempGw[2] = 1;
     // tempGw[3] = 236; // Lab PC
     // tempGw[3] = 115; // Broker Team
-    tempGw[3] = 163; // Laptop
+    tempGw[3] = 115; // Laptop
 
     setIpAddress(tempLocalIpAddress);
     setIpSubnetMask(tempSn);
@@ -693,7 +729,7 @@ int main(void)
 
     // Ports
     s.remotePort = 1883; // Unencrypted MQTT Port
-    s.localPort = 50141; // Gets random port, start at 50000 for testing
+    s.localPort = 50143; // Gets random port, start at 50000 for testing
 
     // SEQ/ACK Nums
     s.sequenceNumber = htonl(2); // Starts at 1
@@ -702,7 +738,7 @@ int main(void)
     // State
     s.state = TCP_CLOSED; // Closed on startup
 
-    setWaterPumpSpeed(512);
+    //setWaterPumpSpeed(512);
 
     // Main Loop
     // RTOS and interrupts would greatly improve this code,
@@ -710,7 +746,10 @@ int main(void)
     while (true)
     {
         // Get plant data 8 seconds
-        getPlantData(&lux, &temp, &hum, &moist, &volume);
+        // getPlantData(&lux, &temp, &hum, &moist, &volume);
+
+        // if (moist > moistersetpoint)
+        // pump water
 
         // Put terminal processing here
         processShell(data, &s);
@@ -814,6 +853,31 @@ int main(void)
                             checkMqttConAck(data, &s);
                         }
 
+                        // MQTT Subscribe Ack handler
+                        if (mqttSubAckNeeded && !isMqttSubAcked())
+                        {
+                            checkMqttSubAck(data, &s);
+                            if (isMqttSubAcked())
+                            {
+                                mqttSubAckNeeded = false;
+                                mqttSubbed = true;
+                            }
+                        }
+
+                        if (mqttSubbed)
+                        {
+                            if (processPubMessage(data, &s, subbedTopicDataStr))
+                            {
+                                subbedTopicData = convertStringToInt(subbedTopicDataStr);
+                            }
+                        }
+
+//                        if(isMqttConAcked() == true)
+//                        {
+//                            //subscribe
+//                            //subscribeMqtt(data, &s,"uta/plant_lux");
+//                            subscribeMqtt(data, &s,"uta/weather/wind_direction");
+//                        }
                         // MQTT Disconnect Fin handler
                         if (mqttDisconnecting)
                         {
