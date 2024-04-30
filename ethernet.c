@@ -435,7 +435,9 @@ void processShell(etherHeader *ether, socket *s)
                         }
                         else if ((strcmp(topic, "setpoint") == 0) || strcmp(topic, "uta/plant/moisture_set_point") == 0)
                         {
-                            data = strktok(NULL, " ");
+                            data[0] = '4';
+                            data[1] = '5';
+                            data[2] = NULL;
                             topic = "uta/plant/moisture_set_point";
                         }
                         else
