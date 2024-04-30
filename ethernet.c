@@ -483,7 +483,7 @@ void processShell(etherHeader *ether, socket *s)
                         setSubbedTopicLengh(topicLen);
                         mqttSubAckNeeded = true;
                         subscribeMqtt(ether, s, topic);
-                        uint8_t k = 0;
+                        // uint8_t k = 0;
                     }
                 }
                 if (strcmp(token, "unsubscribe") == 0)
@@ -492,8 +492,8 @@ void processShell(etherHeader *ether, socket *s)
                     if (topic != NULL)
                     {
                         mqttSubAckNeeded = false;
-                        // unsubscribeMqtt(topic);
-                        uint8_t placeholder = 0;
+                        unsubscribeMqtt(ether, s, topic);
+                        // uint8_t placeholder = 0;
                     }
                 }
             }
@@ -712,7 +712,7 @@ int main(void)
     // Init ethernet interface (eth0)
     putsUart0("\nStarting eth0\n");
     initEther(ETHER_UNICAST | ETHER_BROADCAST | ETHER_HALFDUPLEX);
-    setEtherMacAddress(2, 3, 4, 5, 6, 0x66);
+    setEtherMacAddress(2, 3, 4, 5, 6, 0x79);
 
     // Init EEPROM
     // FIXME: EEPROM is seemingly not storing values between resets?
@@ -738,7 +738,7 @@ int main(void)
     tempLocalIpAddress[0] = 192;
     tempLocalIpAddress[1] = 168;
     tempLocalIpAddress[2] = 1;
-    tempLocalIpAddress[3] = 102;
+    tempLocalIpAddress[3] = 121;
 
     tempSn[0] = 255;
     tempSn[1] = 255;
