@@ -1,5 +1,5 @@
+// Nestor Arteaga and Rolando Rosales
 // TCP Library
-// Modified by Nestor Arteaga and Rolando Rosales (1001850424)
 // Jason Losh
 
 //-----------------------------------------------------------------------------

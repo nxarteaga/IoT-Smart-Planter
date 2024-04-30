@@ -1,3 +1,4 @@
+// Nestor Arteaga and Rolando Rosales
 // Ethernet Framework for Projects 1 and 2
 // Spring 2024
 // Jason Losh

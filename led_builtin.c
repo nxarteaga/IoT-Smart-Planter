@@ -1,6 +1,5 @@
 /*
- * Rolando Rosales LED Builtin Library for TM4C v1.1
- * github.com/rolo-g
+ * Rolando Rosales 1001850424 - LED Builtin Library for TM4C v1.1
  *
  * Comments:
  * This is a very simple library that allows one to very easily control
