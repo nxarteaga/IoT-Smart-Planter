@@ -77,6 +77,10 @@ void subscribeMqtt(etherHeader *ether, socket *s, char strTopic[]);
 void unsubscribeMqtt(etherHeader *ether, socket *s, char strTopic[]);
 void checkMqttConAck(etherHeader *ether, socket *s);
 bool isMqttConAcked(void);
+bool processPubMessage(etherHeader *ether, socket *s, char topicData[]);
+void checkMqttSubAck(etherHeader *ether, socket *s);
+bool isMqttSubAcked(void);
+void setSubbedTopicLengh(uint16_t len);
 
 #endif
 

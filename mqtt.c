@@ -24,14 +24,19 @@
 #include "ip.h"
 #include "eth0.h"
 #include "timer.h"
+//#include "parser.h"
 
 #define MAX_BUFF_SIZE 64
+
+
 
 // ------------------------------------------------------------------------------
 //  Globals
 // ------------------------------------------------------------------------------
 
 bool mqttConnected = false;
+bool mqttSubscribed = false;
+uint16_t subbedTopicLength = 0;
 
 // ------------------------------------------------------------------------------
 //  Structures
@@ -40,6 +45,31 @@ bool mqttConnected = false;
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------
+int32_t atoi(char* str)
+{
+    int32_t result = 0;
+    // Initialize sign as positive
+    int sign = 1;
+
+    int i = 0;
+
+    // If number is negative,
+    // then update sign
+    if (str[0] == '-') {
+        sign = -1;
+
+        // Also update index of first digit
+        i++;
+    }
+    // Iterate through all digits
+    // and update the result
+    for (; str[i] != '\0'; ++i)
+        result = result * 10 + str[i] - '0';
+
+    // Return result with sign
+    return sign * result;
+}
+
 
 void connectMqtt(etherHeader *ether, socket *s)
 {
@@ -176,6 +206,7 @@ void subscribeMqtt(etherHeader *ether, socket *s, char strTopic[])
     payload->topicLength = htons(payloadSize);// Set the topic length
     mqtt->msgLen = (sizeof(mqttSubscribeHeader) + payloadSize+1); //add 1 to payload when not using pointer
     uint8_t dataSize = (sizeof(mqttSubscribe) + mqtt->msgLen);//size of pointer is 8bytes
+    //topicLength = payloadSize;  // save topic length calculating offset.
     dataSize = dataSize - 2;
     // Send the MQTT Connect message
     sendTcpMessage(ether, s, PSH | ACK, (uint8_t *)mqtt, dataSize);
@@ -211,13 +242,57 @@ void unsubscribeMqtt(etherHeader *ether, socket *s, char strTopic[])
 
     //*payloadPtr = 0x0; //assigns the value 0 to QoS.. Not needed for unsubscribed
 
-     // adjust lengths
+     // adjust ldataengths
     payload->topicLength = htons(payloadSize);// Set the topic length
     mqtt->msgLen = (sizeof(mqttSubscribeHeader) + payloadSize); //
     uint8_t dataSize = (sizeof(mqttSubscribe) + mqtt->msgLen);//size of pointer is 8bytes
     dataSize = dataSize - 1;
     // Send the MQTT Connect message
     sendTcpMessage(ether, s, PSH | ACK, (uint8_t *)mqtt, dataSize);
+}
+
+bool processPubMessage(etherHeader *ether, socket *s, char topicData[])
+{
+    tcpHeader* tcp = getTcpHeaderPtr(ether);
+    uint8_t *payloadPtr = tcp->data;
+    bool ok = false;
+
+    // Get the header flags, check if publish
+    if (*payloadPtr == 0x30)
+    {
+        ok = true;
+
+        uint8_t i = 0;
+        uint8_t dataLen = 0;
+
+        // Move ptr to message length
+        payloadPtr += 1;
+
+        // Increment ack number by TCP Payload size
+        s->acknowledgementNumber += (2 + *payloadPtr);
+
+        // Get data length from message length and previously recorded topic length
+        dataLen = *payloadPtr - subbedTopicLength - 2;
+
+        // Point to the start of data (going over message len bits and topic len)
+        payloadPtr += 3 + subbedTopicLength;
+
+        // Store the data to the passed in string
+        for (i = 0; i < dataLen; i++)
+        {
+            topicData[i] = *payloadPtr;
+            payloadPtr++;
+        }
+
+        // Send ack for the publish message to keep receiving messages
+        sendAck();
+    }
+    else
+    {
+        ok = true;
+    }
+
+    return ok;
 }
 
 void checkMqttConAck(etherHeader *ether, socket *s)
@@ -243,3 +318,30 @@ bool isMqttConAcked()
     return mqttConnected;
 }
 
+void checkMqttSubAck(etherHeader *ether, socket *s)
+{
+    tcpHeader* tcp = getTcpHeaderPtr(ether);
+    uint8_t headerFlags = tcp->data[0];
+
+    if (headerFlags == 0x90)
+    {
+        // updateTcpSeqAck(ether, s);
+        s->acknowledgementNumber += 5;
+        sendAck();
+        mqttSubscribed = true;
+    }
+    else
+    {
+        mqttSubscribed = false;
+    }
+}
+
+bool isMqttSubAcked()
+{
+    return mqttSubscribed;
+}
+
+void setSubbedTopicLengh(uint16_t len)
+{
+    subbedTopicLength = len;
+}
