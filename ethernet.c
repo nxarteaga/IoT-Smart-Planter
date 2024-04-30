@@ -777,7 +777,7 @@ int main(void)
     // State
     s.state = TCP_CLOSED; // Closed on startup
 
-    // setWaterPumpSpeed(800);
+    setWaterPumpSpeed(850);
 
     // Main Loop
     // RTOS and interrupts would greatly improve this code,
@@ -788,9 +788,9 @@ int main(void)
         getPlantData(&lux, &temp, &hum, &moist, &volume);
 
         // Moisture Setpoint Pseudocode
-        // if (moisture > moisture_set_point)
+        // if (moisture > moisture_set_point & notpumping)
         // {
-        //      pumpwater()
+        //      pump the water()
         // }
 
         // Auto publishes plant data
