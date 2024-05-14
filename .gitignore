@@ -1,16 +1,14 @@
 # CCS
-.ccsproject
-.cproject
-.project
-.settings/
-.settings/
 .launches/
+.settings/
 Debug/
-targetConfigs/
 targetConfigs/
 
 # VS Code
-/.vscode
+.vscode/
+
+# macOS Thing
+.DS_Store
 
 # Prerequisites
 *.d
