@@ -3,6 +3,7 @@
 .settings/
 Debug/
 targetConfigs/
+Release/
 
 # VS Code
 .vscode/
@@ -56,7 +57,7 @@ targetConfigs/
 
 # Kernel Module Compile Results
 *.mod*
-*.cmd
+# *.cmd
 .tmp_versions/
 modules.order
 Module.symvers
